@@ -1,0 +1,62 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-start.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/docker-guard.mjs"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/rtk-rewrite.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/commit-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/qa-gate.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/architecture-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/security-scan.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/tdd-guard.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

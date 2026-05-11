@@ -1,0 +1,9 @@
+{
+  "pattern": "flat",
+  "layers": {},
+  "disabled": true,
+  "note": "React SPA (Vite) — flat structure detected (src/components, src/hooks, src/lib). Architecture-guard disabled. Update manually if a layered pattern is adopted.",
+  "testExtensions": [".test.ts", ".test.js", ".spec.ts", ".spec.js"],
+  "implementationExtensions": [".ts", ".tsx", ".js", ".jsx"],
+  "ignorePaths": ["node_modules/", ".git/", "dist/", "build/", "coverage/"]
+}
