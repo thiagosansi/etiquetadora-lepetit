@@ -1,24 +1,15 @@
-phase: planning_complete
-plan_md: generated
-user_approval: auto-approved (autonomous mode)
-next: phase_3_implementation
+phase: build_complete
+branch: feature/fila-atendimento-neoenergia
+commits: 2
 
-skill: build
-mode: autonomous
-project: fila-neoenergia
-stack: React + TypeScript + Vite + Tailwind + Supabase + Zenvia
-architecture: feature-based
+completed:
+  - Wave 1: Foundation (scaffold, deps, schema, TabletLayout, types)
+  - Wave 2: Auth (PIN login, AuthGuard, authStore)
+  - Wave 3: Registration (RegistrationPage, form validation, E.164 phone)
+  - Wave 4: Queue + Realtime (OperatorPanel, CallingDisplay, QueueCard, hooks)
+  - Wave 5: SMS (Edge Function, useSendSms, SmsStatusBadge)
+  - Unit tests: 17/17 passing
+  - Build: success
+  - TypeScript: clean
 
-waves:
-  - Wave 1: Foundation (scaffold, deps, schema, layout)
-  - Wave 2: Auth (PIN login)
-  - Wave 3: Registration (customer form)
-  - Wave 4: Queue + Realtime (panel, SKIP LOCKED, sync)
-  - Wave 5: SMS (Edge Function, Zenvia, manual SMS)
-
-key_decisions:
-  - SMS: Zenvia (não Twilio)
-  - Auth: PIN via RPC SECURITY DEFINER
-  - Realtime: Broadcast via trigger notify_queue_change
-  - Concurrency: SELECT FOR UPDATE SKIP LOCKED
-  - State: Zustand + TanStack Query + Supabase Realtime
+next: configure real Supabase project, deploy migrations, register Zenvia alpha sender

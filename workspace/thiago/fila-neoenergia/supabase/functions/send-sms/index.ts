@@ -1,6 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const ZENVIA_API_URL = 'https://api.zenvia.com/v2/channels/sms/messages';
 const EVENT_NAME = 'BAHIA FARM 2026';
 
 interface WebhookPayload {
@@ -10,43 +9,44 @@ interface WebhookPayload {
   target_entry_id?: string; // for manual SMS, target a specific entry
 }
 
-async function sendSmsViaZenvia(
+async function sendSmsViaTwilio(
   toPhone: string,
-  customerName: string,
   message: string,
 ): Promise<boolean> {
-  const apiToken = Deno.env.get('ZENVIA_API_TOKEN');
-  const from = Deno.env.get('ZENVIA_SENDER_ID') ?? 'BAHIAFARM';
+  const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+  const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+  const fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER'); // e.g. +12015551234
 
-  if (!apiToken) {
-    console.error('[send-sms] ZENVIA_API_TOKEN not configured');
+  if (!accountSid || !authToken || !fromNumber) {
+    console.error('[send-sms] Missing Twilio env vars (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)');
     return false;
   }
 
-  const body = JSON.stringify({
-    from,
-    to: toPhone,
-    contents: [{ type: 'text', text: message }],
-  });
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const credentials = btoa(`${accountSid}:${authToken}`);
 
   try {
-    const response = await fetch(ZENVIA_API_URL, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'X-API-TOKEN': apiToken,
-        'Content-Type': 'application/json',
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body,
+      body: new URLSearchParams({
+        From: fromNumber,
+        To: toPhone,   // E.164: +5571999999999
+        Body: message,
+      }),
     });
 
     if (!response.ok) {
       const err = await response.text();
-      console.error(`[send-sms] Zenvia error ${response.status}: ${err}`);
+      console.error(`[send-sms] Twilio error ${response.status}: ${err}`);
       return false;
     }
 
     const data = await response.json();
-    console.log(`[send-sms] Sent to ${toPhone} — messageId: ${data.id}`);
+    console.log(`[send-sms] Sent to ${toPhone} — sid: ${data.sid}`);
     return true;
   } catch (err) {
     console.error('[send-sms] Network error:', err);
@@ -93,7 +93,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Idempotency: skip if SMS already sent
     if (nextEntry.sms_sent) {
       return new Response(JSON.stringify({ sent: false, reason: 'already_sent' }), {
         headers: { 'Content-Type': 'application/json' },
@@ -128,11 +127,11 @@ Deno.serve(async (req: Request) => {
   }
 
   const message =
-    `${EVENT_NAME}: Olá ${entry.customer_name}! ` +
-    `Você é o próximo na fila de atendimento. ` +
-    `Por favor, dirija-se ao local de atendimento da NEOENERGIA.`;
+    `${EVENT_NAME}: Ola ${entry.customer_name}! ` +
+    `Voce e o proximo na fila de atendimento NEOENERGIA. ` +
+    `Por favor, dirija-se ao local.`;
 
-  const sent = await sendSmsViaZenvia(entry.phone, entry.customer_name, message);
+  const sent = await sendSmsViaTwilio(entry.phone, message);
 
   if (sent) {
     // Mark as sent atomically to prevent duplicates
