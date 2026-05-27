@@ -7,19 +7,16 @@
  *  1. body must NOT use `display:flex` — flex in paged media causes browsers (especially
  *     Safari/WebKit) to mis-paginate, producing blank pages.
  *
- *  2. Wrappers (.preview-sheet-wrap, .preview-sheet-scale) stay as normal blocks with
- *     zero margin/padding.  `display:contents` was tried but causes WebKit to lose track
- *     of content during pagination, printing only 1 real page + many blank ones.
+ *  2. The print body contains ONLY bare .sheet elements — no wrapper divs, no <script>.
+ *     handlePrint queries `.print-area .sheet` and copies their outerHTML directly.
+ *     Wrappers were tried in several combinations (display:contents, display:block with
+ *     break-after on the wrapper, :last-of-type) but WebKit consistently produced blank
+ *     pages from phantom wrapper height or incorrect break propagation.
  *
- *  3. `break-after:page` belongs on .preview-sheet-WRAP (the outermost wrapper), not on
- *     .sheet.  Putting it on the wrapper guarantees the browser breaks between wrappers
- *     at the correct level without relying on fragmentation propagation through nested boxes.
- *
- *  4. Use `:last-of-type`, NOT `:last-child`, to cancel the forced break on the last
- *     wrapper.  The print window body ends with a <script> tag (type = script element),
- *     so `.preview-sheet-wrap:last-child` never matches — <script> is always the true
- *     last child.  `:last-of-type` checks the element's tag name (div), ignoring the
- *     trailing <script>, so it correctly identifies the last wrapper div.
+ *  3. `break-after:page` on .sheet, cancelled on `.sheet:last-child`.
+ *     Because the body contains ONLY .sheet elements (no trailing <script>), :last-child
+ *     unambiguously identifies the final sheet.  This gives one forced break between each
+ *     pair of sheets and no forced break after the last one.
  */
 export const PRINT_CSS = `
   * { box-sizing: border-box; }
@@ -43,23 +40,6 @@ export const PRINT_CSS = `
     margin: 0;
   }
 
-  .preview-sheet-wrap,
-  .preview-sheet-scale {
-    display: block;
-    margin: 0;
-    padding: 0;
-  }
-
-  .preview-sheet-wrap {
-    break-after: page;
-    page-break-after: always;
-  }
-
-  .preview-sheet-wrap:last-of-type {
-    break-after: auto;
-    page-break-after: auto;
-  }
-
   .sheet {
     width: var(--sheet-width);
     height: var(--sheet-height);
@@ -71,6 +51,13 @@ export const PRINT_CSS = `
     background: white;
     margin: 0;
     overflow: hidden;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
 
   .label-box {
