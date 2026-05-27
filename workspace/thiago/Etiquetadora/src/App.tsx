@@ -297,28 +297,6 @@ export default function App() {
     setFabricacao(etiqueta.fabricacao);
   };
 
-  const applyEditorToSelected = () => {
-    if (!selectedPage) return;
-
-    setPages((current) =>
-      current.map((page) => {
-        if (page.id !== selectedPage.id) return page;
-
-        const etiquetas = [...page.etiquetas] as [EtiquetaData, EtiquetaData];
-        etiquetas[selectedSlotIndex] = {
-          ...etiquetas[selectedSlotIndex],
-          sabor,
-          massa,
-          fabricacao,
-        };
-
-        return {
-          ...page,
-          etiquetas,
-        };
-      })
-    );
-  };
 
   const applyCurrentDataToAll = () => {
     setPages((current) =>
