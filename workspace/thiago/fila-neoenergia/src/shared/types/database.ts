@@ -82,19 +82,34 @@ export interface Database {
       };
     };
     Functions: {
-      call_next_in_queue: {
-        Args: { p_queue_id: string };
-        Returns: {
-          id: string;
-          customer_name: string;
-          phone: string;
-          scheduled_time: string;
-          status: string;
-        }[];
-      };
       authenticate_operator: {
         Args: { p_pin: string };
-        Returns: { id: string; name: string } | null;
+        Returns: Json;
+      };
+      get_or_create_today_queue: {
+        Args: { p_name?: string };
+        Returns: Json;
+      };
+      register_customer: {
+        Args: {
+          p_queue_id: string;
+          p_name: string;
+          p_phone: string;
+          p_scheduled_time: string;
+        };
+        Returns: Json;
+      };
+      call_next_in_queue: {
+        Args: { p_queue_id: string };
+        Returns: Json[];
+      };
+      update_entry_status: {
+        Args: { p_entry_id: string; p_status: string };
+        Returns: Json;
+      };
+      mark_sms_sent: {
+        Args: { p_entry_id: string };
+        Returns: undefined;
       };
       get_queue_position: {
         Args: { entry_id: string };
