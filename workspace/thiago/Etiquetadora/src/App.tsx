@@ -523,6 +523,29 @@ const dataUrl = await toPng(exportNode, {
   }
 };
 
+  const handlePrint = () => {
+    const printArea = document.querySelector<HTMLElement>(".print-area");
+    if (!printArea) {
+      window.print();
+      return;
+    }
+
+    const printRoot = document.createElement("div");
+    printRoot.id = "print-root";
+    printRoot.innerHTML = printArea.innerHTML;
+    document.body.appendChild(printRoot);
+
+    const cleanup = () => {
+      if (document.body.contains(printRoot)) {
+        document.body.removeChild(printRoot);
+      }
+      window.removeEventListener("afterprint", cleanup);
+    };
+
+    window.addEventListener("afterprint", cleanup);
+    window.print();
+  };
+
   return (
     <div className="min-h-screen bg-neutral-100 p-4 md:p-8">
       <style>{`
@@ -550,28 +573,18 @@ const dataUrl = await toPng(exportNode, {
             background: white !important;
           }
 
-          body * {
-            visibility: hidden;
+          /* Hide the entire React app root — only #print-root is shown */
+          body > *:not(#print-root) {
+            display: none !important;
           }
 
-          .print-area,
-          .print-area * {
-            visibility: visible;
-          }
-
-          .print-shell {
-            padding: 0 !important;
+          #print-root {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 0 !important;
             margin: 0 !important;
-            max-width: none !important;
-            border-radius: 0 !important;
-            background: white !important;
-          }
-
-          .print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+            padding: 0 !important;
+            width: 100% !important;
           }
 
           .preview-sheet-wrap,
@@ -1111,7 +1124,7 @@ const dataUrl = await toPng(exportNode, {
                   <Button
                     className="rounded-2xl"
                     variant="outline"
-                    onClick={() => window.print()}
+                    onClick={handlePrint}
                   >
                     <Printer className="mr-2 h-4 w-4" /> Imprimir
                   </Button>
