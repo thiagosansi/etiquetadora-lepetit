@@ -1,0 +1,18 @@
+{
+  "auth": true,
+  "unit_tests": true,
+  "tdd": true,
+  "bdd": true,
+  "e2e_cypress": true,
+  "docker": true,
+  "hexagonal": false,
+  "feature_based": true,
+  "realtime": true,
+  "sms_integration": true,
+  "agent_browser": true,
+  "ci_cd": false,
+  "rate_limiting": false,
+  "observability": false,
+  "load_tests": false,
+  "multi_tenancy": false
+}
