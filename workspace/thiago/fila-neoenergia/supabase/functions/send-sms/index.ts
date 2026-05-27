@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const EVENT_NAME = 'BAHIA FARM 2026';
+const TEXTBEE_API_URL = 'https://api.textbee.dev/api/v1/gateway/devices';
 
 interface WebhookPayload {
   entry_id: string;
@@ -9,44 +10,53 @@ interface WebhookPayload {
   target_entry_id?: string; // for manual SMS, target a specific entry
 }
 
-async function sendSmsViaTwilio(
+/**
+ * Send SMS via TextBee (https://textbee.dev)
+ * TextBee uses an Android phone as SMS gateway — SMS is sent from the device's SIM card.
+ * No CNPJ required. Free within the carrier plan.
+ *
+ * Setup:
+ *   1. Create account at textbee.dev
+ *   2. Install TextBee app on Android phone, grant SMS permissions
+ *   3. Register device and generate API key in dashboard
+ *   4. Set TEXTBEE_API_KEY and TEXTBEE_DEVICE_ID in Supabase Edge Function secrets
+ */
+async function sendSmsViaTextBee(
   toPhone: string,
   message: string,
 ): Promise<boolean> {
-  const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-  const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-  const fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER'); // e.g. +12015551234
+  const apiKey = Deno.env.get('TEXTBEE_API_KEY');
+  const deviceId = Deno.env.get('TEXTBEE_DEVICE_ID');
 
-  if (!accountSid || !authToken || !fromNumber) {
-    console.error('[send-sms] Missing Twilio env vars (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)');
+  if (!apiKey || !deviceId) {
+    console.error('[send-sms] Missing TextBee env vars (TEXTBEE_API_KEY, TEXTBEE_DEVICE_ID)');
     return false;
   }
 
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-  const credentials = btoa(`${accountSid}:${authToken}`);
-
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+    const response = await fetch(
+      `${TEXTBEE_API_URL}/${deviceId}/send-sms`,
+      {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recipients: [toPhone],
+          message,
+        }),
       },
-      body: new URLSearchParams({
-        From: fromNumber,
-        To: toPhone,   // E.164: +5571999999999
-        Body: message,
-      }),
-    });
+    );
 
     if (!response.ok) {
       const err = await response.text();
-      console.error(`[send-sms] Twilio error ${response.status}: ${err}`);
+      console.error(`[send-sms] TextBee error ${response.status}: ${err}`);
       return false;
     }
 
     const data = await response.json();
-    console.log(`[send-sms] Sent to ${toPhone} — sid: ${data.sid}`);
+    console.log(`[send-sms] Sent to ${toPhone} via TextBee`, data);
     return true;
   } catch (err) {
     console.error('[send-sms] Network error:', err);
@@ -131,7 +141,7 @@ Deno.serve(async (req: Request) => {
     `Voce e o proximo na fila de atendimento NEOENERGIA. ` +
     `Por favor, dirija-se ao local.`;
 
-  const sent = await sendSmsViaTwilio(entry.phone, message);
+  const sent = await sendSmsViaTextBee(entry.phone, message);
 
   if (sent) {
     // Mark as sent atomically to prevent duplicates
