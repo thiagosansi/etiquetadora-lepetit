@@ -539,7 +539,7 @@ const dataUrl = await toPng(exportNode, {
     const printArea = document.querySelector<HTMLElement>(".print-area");
     if (!printArea) return;
 
-    const printWindow = window.open("", "_blank", "width=1,height=1");
+    const printWindow = window.open("", "_blank", "width=1,height=1,top=10000,left=10000");
     if (!printWindow) return;
 
     const css = `
