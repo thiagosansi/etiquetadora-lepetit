@@ -2,15 +2,24 @@
  * CSS injected into the dedicated print window opened by handlePrint.
  * Exported as a constant so it can be unit-tested independently.
  *
- * Critical invariants (enforced by print-css.test.ts):
- *  1. body must NOT use `display:flex` — flex containers paginate poorly in paged media.
- *  2. Wrapper divs (.print-area, .preview-sheet-wrap, .preview-sheet-scale) must use
- *     `display:contents` so they don't generate extra layout boxes that add blank pages.
- *  3. .sheet must have `break-after:page` to force one physical page per sheet.
- *  4. The `break-after:auto` override must target `.preview-sheet-wrap:last-child .sheet`
- *     — NOT `.sheet:last-child`, because every .sheet is always :last-child of its own
- *     .preview-sheet-scale parent, making that selector match all sheets and breaking
- *     the pagination logic.
+ * Pagination rules — why each choice matters:
+ *
+ *  1. body must NOT use `display:flex` — flex in paged media causes browsers (especially
+ *     Safari/WebKit) to mis-paginate, producing blank pages.
+ *
+ *  2. Wrappers (.preview-sheet-wrap, .preview-sheet-scale) stay as normal blocks with
+ *     zero margin/padding.  `display:contents` was tried but causes WebKit to lose track
+ *     of content during pagination, printing only 1 real page + many blank ones.
+ *
+ *  3. `break-after:page` belongs on .preview-sheet-WRAP (the outermost wrapper), not on
+ *     .sheet.  Putting it on the wrapper guarantees the browser breaks between wrappers
+ *     at the correct level without relying on fragmentation propagation through nested boxes.
+ *
+ *  4. Use `:last-of-type`, NOT `:last-child`, to cancel the forced break on the last
+ *     wrapper.  The print window body ends with a <script> tag (type = script element),
+ *     so `.preview-sheet-wrap:last-child` never matches — <script> is always the true
+ *     last child.  `:last-of-type` checks the element's tag name (div), ignoring the
+ *     trailing <script>, so it correctly identifies the last wrapper div.
  */
 export const PRINT_CSS = `
   * { box-sizing: border-box; }
@@ -34,10 +43,21 @@ export const PRINT_CSS = `
     margin: 0;
   }
 
-  .print-area,
   .preview-sheet-wrap,
   .preview-sheet-scale {
-    display: contents;
+    display: block;
+    margin: 0;
+    padding: 0;
+  }
+
+  .preview-sheet-wrap {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .preview-sheet-wrap:last-of-type {
+    break-after: auto;
+    page-break-after: auto;
   }
 
   .sheet {
@@ -50,14 +70,7 @@ export const PRINT_CSS = `
     column-gap: var(--gap-x);
     background: white;
     margin: 0;
-    break-after: page;
-    page-break-after: always;
     overflow: hidden;
-  }
-
-  .preview-sheet-wrap:last-child .sheet {
-    break-after: auto;
-    page-break-after: auto;
   }
 
   .label-box {

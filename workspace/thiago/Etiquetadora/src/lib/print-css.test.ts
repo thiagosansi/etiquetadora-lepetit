@@ -2,55 +2,76 @@ import { describe, it, expect } from "vitest";
 import { PRINT_CSS } from "./print-css";
 
 /**
- * Regression tests for the blank-pages print bug.
+ * Regression tests for the blank-pages print bug (two iterations of fixes).
  *
- * Root cause (fixed in commit b484687+):
- *   1. `body { display: flex }` in paged media causes the browser to mis-paginate,
- *      producing blank pages after the real content.
- *   2. `.sheet:last-child` matched EVERY .sheet because each one is the sole child
- *      of its own .preview-sheet-scale parent.  This caused `break-after: auto` to
- *      override `break-after: page` on all sheets, removing explicit page breaks.
- *      Combined with flex layout, Safari/macOS generated 7 extra blank pages.
+ * Original root causes:
+ *  A. `body { display:flex }` — flex in paged media mis-paginates in Safari/WebKit.
+ *  B. `.sheet:last-child` matched ALL .sheet elements (each is sole child of its
+ *     .preview-sheet-scale parent), so break-after:auto fired on every sheet.
+ *
+ * Second iteration root causes (from the display:contents fix):
+ *  C. `display:contents` on wrappers caused WebKit to lose content during pagination,
+ *     printing only 1 real page then blank pages.
+ *  D. `.preview-sheet-wrap:last-child` never matched because the <script> tag is always
+ *     the last child of body — so break-after:page remained on every wrapper including
+ *     the last, producing a trailing blank page.
+ *
+ * Correct approach:
+ *  - break-after:page on .preview-sheet-wrap (outermost wrapper), not on .sheet
+ *  - :last-of-type to cancel the break on the last wrapper (ignores the <script> sibling)
+ *  - plain display:block on wrappers (no display:contents, no display:flex on body)
  */
 describe("PRINT_CSS — blank-pages regression", () => {
+  // ── Invariant 1: no flex on body ──────────────────────────────────────────
   it("body must not use display:flex", () => {
-    // Normalise whitespace so the check is formatting-agnostic.
     const bodyBlock = extractBlock(PRINT_CSS, "html, body");
     expect(bodyBlock).toBeTruthy();
     expect(bodyBlock).not.toMatch(/display\s*:\s*flex/);
   });
 
-  it("wrapper divs must use display:contents to avoid ghost layout boxes", () => {
-    // All three wrappers must appear together in a single selector block that
-    // sets display:contents.  They must NOT be present in any block that sets
-    // display:flex or display:block.
-    const contentsBlock = extractBlockByProperty(PRINT_CSS, "display", "contents");
-    expect(contentsBlock).toBeTruthy();
-    expect(contentsBlock).toMatch(/\.print-area/);
-    expect(contentsBlock).toMatch(/\.preview-sheet-wrap/);
-    expect(contentsBlock).toMatch(/\.preview-sheet-scale/);
-  });
-
-  it(".sheet must declare break-after:page to force one page per sheet", () => {
-    const sheetBlock = extractBlock(PRINT_CSS, ".sheet");
-    expect(sheetBlock).toBeTruthy();
-    expect(sheetBlock).toMatch(/break-after\s*:\s*page/);
-    expect(sheetBlock).toMatch(/page-break-after\s*:\s*always/);
-  });
-
-  it("break-after:auto must target .preview-sheet-wrap:last-child .sheet, not .sheet:last-child", () => {
-    // .sheet:last-child matches ALL sheets (each is :last-child of its own
-    // .preview-sheet-scale).  The override must use the parent wrapper selector.
-    expect(PRINT_CSS).toMatch(/\.preview-sheet-wrap:last-child\s+\.sheet/);
-
-    // The bare `.sheet:last-child` selector must not appear anywhere in the CSS
-    // (it was the source of the bug).
-    expect(PRINT_CSS).not.toMatch(/\.sheet:last-child/);
-  });
-
   it("body must not declare flex-direction", () => {
     const bodyBlock = extractBlock(PRINT_CSS, "html, body");
     expect(bodyBlock).not.toMatch(/flex-direction/);
+  });
+
+  // ── Invariant 2: wrappers must be plain blocks, not display:contents ──────
+  it("wrappers must use display:block (not display:contents)", () => {
+    const wrappersBlock = extractBlock(PRINT_CSS, ".preview-sheet-wrap,\n  .preview-sheet-scale");
+    expect(wrappersBlock).toBeTruthy();
+    expect(wrappersBlock).toMatch(/display\s*:\s*block/);
+    expect(wrappersBlock).not.toMatch(/display\s*:\s*contents/);
+  });
+
+  it("PRINT_CSS must not use display:contents anywhere", () => {
+    expect(PRINT_CSS).not.toMatch(/display\s*:\s*contents/);
+  });
+
+  // ── Invariant 3: page break must be on .preview-sheet-wrap ────────────────
+  it(".preview-sheet-wrap must declare break-after:page", () => {
+    // There are two .preview-sheet-wrap blocks; we want the standalone one that
+    // carries the page-break rules (not the shared block with .preview-sheet-scale).
+    const wrapBlock = extractExactBlock(PRINT_CSS, ".preview-sheet-wrap");
+    expect(wrapBlock).toBeTruthy();
+    expect(wrapBlock).toMatch(/break-after\s*:\s*page/);
+    expect(wrapBlock).toMatch(/page-break-after\s*:\s*always/);
+  });
+
+  // ── Invariant 4: :last-of-type cancels the break, :last-child must not ────
+  it("break-after:auto must use :last-of-type, not :last-child", () => {
+    // :last-of-type correctly ignores the trailing <script> element in body.
+    expect(PRINT_CSS).toMatch(/\.preview-sheet-wrap:last-of-type/);
+
+    // :last-child would never match because <script> is always the true last
+    // child of body — this selector must be absent from the CSS.
+    expect(PRINT_CSS).not.toMatch(/\.preview-sheet-wrap:last-child/);
+    expect(PRINT_CSS).not.toMatch(/\.sheet:last-child/);
+  });
+
+  it(".preview-sheet-wrap:last-of-type must cancel page break", () => {
+    const lastBlock = extractBlock(PRINT_CSS, ".preview-sheet-wrap:last-of-type");
+    expect(lastBlock).toBeTruthy();
+    expect(lastBlock).toMatch(/break-after\s*:\s*auto/);
+    expect(lastBlock).toMatch(/page-break-after\s*:\s*auto/);
   });
 });
 
@@ -59,8 +80,7 @@ describe("PRINT_CSS — blank-pages regression", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Extracts the content of the first CSS block whose selector contains `selector`.
- * Returns the text between the opening and closing braces.
+ * Extracts the body of the first CSS block whose selector contains `selector`.
  */
 function extractBlock(css: string, selector: string): string | null {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -70,18 +90,16 @@ function extractBlock(css: string, selector: string): string | null {
 }
 
 /**
- * Finds the first block that contains `property: value` and returns the full
- * block content (selector + body joined).
+ * Extracts the body of a block whose selector is EXACTLY `selector` (trimmed),
+ * i.e. the selector is not part of a comma-separated group.
  */
-function extractBlockByProperty(css: string, property: string, value: string): string | null {
+function extractExactBlock(css: string, selector: string): string | null {
   const re = /([^{}]+)\{([^}]*)\}/gs;
   let match: RegExpExecArray | null;
-  const propRe = new RegExp(`${property}\\s*:\\s*${value}`);
   while ((match = re.exec(css)) !== null) {
-    const body = match[2];
-    if (propRe.test(body)) {
-      return match[1] + "{" + body + "}";
-    }
+    const rawSelector = match[1].trim();
+    // Accept only single-selector blocks that match exactly.
+    if (rawSelector === selector) return match[2];
   }
   return null;
 }
