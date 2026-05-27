@@ -537,25 +537,172 @@ const dataUrl = await toPng(exportNode, {
 
   const handlePrint = () => {
     const printArea = document.querySelector<HTMLElement>(".print-area");
-    if (!printArea) {
-      window.print();
-      return;
-    }
+    if (!printArea) return;
 
-    const printRoot = document.createElement("div");
-    printRoot.id = "print-root";
-    printRoot.innerHTML = printArea.innerHTML;
-    document.body.appendChild(printRoot);
+    const printWindow = window.open("", "_blank", "width=1,height=1");
+    if (!printWindow) return;
 
-    const cleanup = () => {
-      if (document.body.contains(printRoot)) {
-        document.body.removeChild(printRoot);
+    const css = `
+      * { box-sizing: border-box; }
+
+      :root {
+        --sheet-width: 103mm;
+        --sheet-height: 30mm;
+        --label-width: 50mm;
+        --label-height: 30mm;
+        --gap-x: 3mm;
       }
-      window.removeEventListener("afterprint", cleanup);
-    };
 
-    window.addEventListener("afterprint", cleanup);
-    window.print();
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: white;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+
+      @page {
+        size: 103mm 30mm;
+        margin: 0;
+      }
+
+      .preview-sheet-wrap,
+      .preview-sheet-scale {
+        overflow: visible;
+        width: auto;
+        height: auto;
+        transform: none;
+        padding: 0;
+      }
+
+      .sheet {
+        width: var(--sheet-width);
+        height: var(--sheet-height);
+        min-width: var(--sheet-width);
+        min-height: var(--sheet-height);
+        display: grid;
+        grid-template-columns: var(--label-width) var(--label-width);
+        column-gap: var(--gap-x);
+        background: white;
+        margin: 0;
+        break-after: page;
+        page-break-after: always;
+        overflow: hidden;
+      }
+
+      .sheet:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+
+      .label-box {
+        width: var(--label-width);
+        height: var(--label-height);
+        padding: 1.5mm 1.8mm 1.2mm 2mm;
+        overflow: hidden;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #111;
+        display: flex;
+        align-items: stretch;
+        justify-content: stretch;
+      }
+
+      .label-inner {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1.2mm;
+      }
+
+      .left-content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: left;
+      }
+
+      .brand-name {
+        font-size: 2.95mm;
+        font-weight: 700;
+        line-height: 1;
+        display: inline-block;
+        text-decoration: underline;
+        text-decoration-color: #d00000;
+        text-decoration-thickness: 0.22mm;
+        text-underline-offset: 0.28mm;
+        margin-bottom: 0.5mm;
+        white-space: nowrap;
+      }
+
+      .massa-topo {
+        font-size: 2.45mm;
+        line-height: 1;
+        margin-bottom: 0.75mm;
+        white-space: nowrap;
+      }
+
+      .line {
+        font-size: 2.45mm;
+        line-height: 1.08;
+        margin-bottom: 0.25mm;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .footer-left {
+        font-size: 1.9mm;
+        line-height: 1.08;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .footer-left:first-of-type {
+        margin-top: 0.9mm;
+      }
+
+      .right-logo {
+        width: 15.5mm;
+        min-width: 15.5mm;
+        height: 15.5mm;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.28;
+        flex-shrink: 0;
+      }
+
+      .right-logo img {
+        width: 100%;
+        height: auto;
+        object-fit: contain;
+        filter: grayscale(100%) contrast(140%);
+      }
+    `;
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Etiquetas</title>
+    <style>${css}</style>
+  </head>
+  <body>
+    ${printArea.innerHTML}
+    <script>
+      window.onload = function () { window.print(); };
+      window.onafterprint = function () { window.close(); };
+    <\/script>
+  </body>
+</html>`);
+
+    printWindow.document.close();
   };
 
   return (
@@ -579,51 +726,10 @@ const dataUrl = await toPng(exportNode, {
         }
 
         @media print {
-          html, body {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-          }
-
-          /* Hide the entire React app root — only #print-root is shown */
-          body > *:not(#print-root) {
+          /* Printing is handled via a dedicated window opened by handlePrint.
+             This block prevents accidental prints via Ctrl+P. */
+          body > * {
             display: none !important;
-          }
-
-          #print-root {
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-          }
-
-          .preview-sheet-wrap,
-          .preview-sheet-scale {
-            overflow: visible !important;
-            width: auto !important;
-            height: auto !important;
-            transform: none !important;
-            padding: 0 !important;
-          }
-
-          .sheet {
-            width: var(--sheet-width);
-            height: var(--sheet-height);
-            margin: 0;
-            break-after: page;
-            page-break-after: always;
-            box-shadow: none !important;
-            border: 0 !important;
-            border-radius: 0 !important;
-            background: white !important;
-            transform: none !important;
-          }
-
-          .sheet:last-child {
-            break-after: auto;
-            page-break-after: auto;
           }
         }
 
