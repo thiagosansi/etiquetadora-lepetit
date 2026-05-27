@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   Printer,
@@ -333,6 +333,40 @@ export default function App() {
       }))
     );
   };
+
+  const applyToCurrentPage = () => {
+    setPages((current) =>
+      current.map((page) => {
+        if (page.id !== selectedPageId) return page;
+        return {
+          ...page,
+          etiquetas: page.etiquetas.map((etiqueta) => ({
+            ...etiqueta,
+            sabor,
+            massa,
+            fabricacao,
+          })) as [EtiquetaData, EtiquetaData],
+        };
+      })
+    );
+  };
+
+  // Live update: apply editor values to the selected label on every field change
+  useEffect(() => {
+    setPages((current) =>
+      current.map((page) => {
+        if (page.id !== selectedPageId) return page;
+        const etiquetas = [...page.etiquetas] as [EtiquetaData, EtiquetaData];
+        etiquetas[selectedSlotIndex] = {
+          ...etiquetas[selectedSlotIndex],
+          sabor,
+          massa,
+          fabricacao,
+        };
+        return { ...page, etiquetas };
+      })
+    );
+  }, [sabor, massa, fabricacao, selectedPageId, selectedSlotIndex]);
 
   const addMoreEtiquetas = () => {
     const nextPage = createPageFromTemplate({ sabor, massa, fabricacao });
@@ -1108,9 +1142,10 @@ const dataUrl = await toPng(exportNode, {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     className="rounded-2xl"
-                    onClick={applyEditorToSelected}
+                    variant="outline"
+                    onClick={applyToCurrentPage}
                   >
-                    Aplicar na selecionada
+                    Aplicar na página
                   </Button>
 
                   <Button
