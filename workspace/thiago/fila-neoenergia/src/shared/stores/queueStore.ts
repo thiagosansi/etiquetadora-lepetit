@@ -75,7 +75,18 @@ export const useQueueStore = create<QueueState>()((set) => ({
 // Selector hooks (tkdodo pattern — avoid re-renders)
 export const useEntries = () => useQueueStore((s) => s.entries);
 export const useWaitingEntries = () =>
-  useQueueStore(useShallow((s) => s.entries.filter((e) => e.status === 'waiting')));
+  useQueueStore(
+    useShallow((s) =>
+      s.entries
+        .filter((e) => e.status === 'waiting')
+        .sort((a, b) => {
+          if (a.position == null && b.position == null) return 0;
+          if (a.position == null) return 1;
+          if (b.position == null) return -1;
+          return a.position - b.position;
+        }),
+    ),
+  );
 export const useCalledEntry = () => useQueueStore((s) => s.calledEntry);
 export const useSmsStatus = (entryId: string) =>
   useQueueStore((s) => s.smsStatusMap[entryId]);

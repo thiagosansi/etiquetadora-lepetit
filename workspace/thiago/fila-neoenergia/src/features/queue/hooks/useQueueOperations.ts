@@ -4,6 +4,26 @@ import { supabase } from '@/shared/lib/supabase';
 import { useQueueActions } from '@/shared/stores/queueStore';
 import type { QueueEntry, QueueStatus } from '@/shared/types';
 
+export function useMoveEntry(queueId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ entryId, direction }: { entryId: string; direction: 'up' | 'down' }) => {
+      const { error } = await supabase.rpc('move_queue_entry', {
+        p_entry_id: entryId,
+        p_direction: direction,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queue', queueId] });
+    },
+    onError: () => {
+      toast.error('Erro ao mover cliente. Tente novamente.');
+    },
+  });
+}
+
 export function useCallNext(queueId: string | null) {
   const { setCalledEntry } = useQueueActions();
 

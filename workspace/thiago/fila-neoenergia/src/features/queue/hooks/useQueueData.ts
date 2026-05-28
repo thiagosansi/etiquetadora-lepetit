@@ -17,7 +17,7 @@ export function useQueueData(queueId: string | null) {
         .select('*')
         .eq('queue_id', queueId)
         .in('status', ['waiting', 'in_service', 'absent'])
-        .order('scheduled_time', { ascending: true })
+        .order('position', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true });
 
       if (error) throw error;

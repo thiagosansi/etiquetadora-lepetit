@@ -132,6 +132,8 @@ export function OperatorPanel() {
                 entry={entry}
                 position={index + 1}
                 queueId={queueId!}
+                isFirst={index === 0}
+                isLast={index === waitingEntries.length - 1}
               />
             ))}
           </div>
