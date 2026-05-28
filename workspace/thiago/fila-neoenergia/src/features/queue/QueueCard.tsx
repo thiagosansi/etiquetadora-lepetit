@@ -1,6 +1,6 @@
 import { SmsStatusBadge } from '@/features/sms/SmsStatusBadge';
 import { useSendSms } from '@/features/sms/hooks/useSendSms';
-import { useUpdateStatus, useMoveEntry } from './hooks/useQueueOperations';
+import { useUpdateStatus, useMoveEntry, useMarkAbsent } from './hooks/useQueueOperations';
 import { maskPhone, formatTime } from '@/shared/lib/utils';
 import type { QueueEntry } from '@/shared/types';
 
@@ -30,7 +30,9 @@ export function QueueCard({ entry, position, queueId, isFirst, isLast }: QueueCa
   const updateStatus = useUpdateStatus(queueId);
   const sendSms = useSendSms();
   const moveEntry = useMoveEntry(queueId);
-  const isBusy = updateStatus.isPending || sendSms.isPending || moveEntry.isPending;
+  const markAbsent = useMarkAbsent(queueId);
+  const isBusy =
+    updateStatus.isPending || sendSms.isPending || moveEntry.isPending || markAbsent.isPending;
 
   return (
     <div
@@ -75,8 +77,13 @@ export function QueueCard({ entry, position, queueId, isFirst, isLast }: QueueCa
           </span>
         </div>
         <p className="text-sm text-gray-500 mt-0.5">{maskPhone(entry.phone)}</p>
-        <div className="flex items-center gap-2 mt-1.5">
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
           <span className="text-xs text-gray-400">{STATUS_LABELS[entry.status]}</span>
+          {entry.was_absent && (
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+              ⚠ Ausente anterior
+            </span>
+          )}
           <SmsStatusBadge entryId={entry.id} />
         </div>
       </div>
@@ -101,17 +108,17 @@ export function QueueCard({ entry, position, queueId, isFirst, isLast }: QueueCa
               type="button"
               onClick={() => updateStatus.mutate({ entryId: entry.id, status: 'finished' })}
               disabled={isBusy}
-              className="h-10 px-3 text-sm font-medium bg-gray-100 text-gray-700 rounded-xl
-                         active:bg-gray-200 disabled:opacity-40 touch-manipulation transition-colors"
+              className="h-10 px-3 text-sm font-bold bg-emerald-600 text-white rounded-xl
+                         active:bg-emerald-700 disabled:opacity-40 touch-manipulation transition-colors"
             >
               Finalizar
             </button>
             <button
               type="button"
-              onClick={() => updateStatus.mutate({ entryId: entry.id, status: 'absent' })}
+              onClick={() => markAbsent.mutate({ entryId: entry.id })}
               disabled={isBusy}
-              className="h-10 px-3 text-sm font-medium bg-amber-50 text-amber-700 rounded-xl
-                         active:bg-amber-100 disabled:opacity-40 touch-manipulation transition-colors"
+              className="h-10 px-3 text-sm font-bold bg-amber-500 text-white rounded-xl
+                         active:bg-amber-600 disabled:opacity-40 touch-manipulation transition-colors"
             >
               Ausente
             </button>

@@ -1,11 +1,13 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCallNext, useUpdateStatus } from './hooks/useQueueOperations';
+import { useCallNext, useUpdateStatus, useMarkAbsent } from './hooks/useQueueOperations';
 import { useQueueData, useGetOrCreateQueue } from './hooks/useQueueData';
 import { useQueueRealtime } from './hooks/useQueueRealtime';
 import { useWaitingEntries, useCalledEntry } from '@/shared/stores/queueStore';
 import { useOperator, useAuthActions } from '@/shared/stores/authStore';
 import { CallingDisplay } from './CallingDisplay';
 import { QueueCard } from './QueueCard';
+import { HistoryModal } from './HistoryModal';
 import { TabletLayout } from '@/shared/components/TabletLayout';
 import { LOGO_SRC } from '@/assets/logo';
 
@@ -13,6 +15,7 @@ export function OperatorPanel() {
   const navigate = useNavigate();
   const operator = useOperator();
   const { logout } = useAuthActions();
+  const [showHistory, setShowHistory] = useState(false);
 
   // Get today's queue
   const { data: queue, isLoading: queueLoading } = useGetOrCreateQueue();
@@ -27,8 +30,10 @@ export function OperatorPanel() {
 
   const callNext = useCallNext(queueId);
   const updateStatus = useUpdateStatus(queueId);
+  const markAbsent = useMarkAbsent(queueId);
 
   const isLoading = queueLoading || entriesLoading;
+  const actionBusy = callNext.isPending || updateStatus.isPending || markAbsent.isPending;
 
   function handleLogout() {
     logout();
@@ -43,14 +48,26 @@ export function OperatorPanel() {
           <img src={LOGO_SRC} alt="NEOENERGIA" className="h-8 object-contain" />
           <p className="text-xs text-gray-500">BAHIA FARM 2026 · {operator?.name ?? ''}</p>
         </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="h-10 px-4 text-sm text-gray-600 font-medium rounded-xl
-                     active:bg-gray-100 transition-colors touch-manipulation"
-        >
-          Sair
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            className="h-10 px-4 text-sm text-gray-600 font-medium rounded-xl
+                       active:bg-gray-100 transition-colors touch-manipulation flex items-center gap-1.5"
+            aria-label="Ver histórico de chamados"
+          >
+            <span>📋</span>
+            <span>Histórico</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="h-10 px-4 text-sm text-gray-600 font-medium rounded-xl
+                       active:bg-gray-100 transition-colors touch-manipulation"
+          >
+            Sair
+          </button>
+        </div>
       </header>
 
       {/* Calling display */}
@@ -62,7 +79,7 @@ export function OperatorPanel() {
         <button
           type="button"
           onClick={() => callNext.mutate()}
-          disabled={callNext.isPending || isLoading || waitingEntries.length === 0}
+          disabled={actionBusy || isLoading || waitingEntries.length === 0}
           className="col-span-2 h-16 bg-blue-600 text-white text-xl font-bold rounded-2xl
                      active:bg-blue-700 disabled:opacity-40 transition-colors
                      touch-manipulation flex items-center justify-center gap-2"
@@ -79,11 +96,13 @@ export function OperatorPanel() {
               updateStatus.mutate({ entryId: calledEntry.id, status: 'finished' });
             }
           }}
-          disabled={!calledEntry || updateStatus.isPending}
-          className="h-14 bg-gray-100 text-gray-800 text-base font-semibold rounded-xl
-                     active:bg-gray-200 disabled:opacity-40 transition-colors touch-manipulation"
+          disabled={!calledEntry || actionBusy}
+          className="h-16 bg-emerald-600 text-white text-base font-bold rounded-2xl
+                     active:bg-emerald-700 disabled:opacity-30 transition-colors touch-manipulation
+                     flex flex-col items-center justify-center gap-0.5"
         >
-          Finalizar
+          <span className="text-xl">✓</span>
+          <span>Finalizar</span>
         </button>
 
         {/* Mark absent */}
@@ -91,14 +110,16 @@ export function OperatorPanel() {
           type="button"
           onClick={() => {
             if (calledEntry) {
-              updateStatus.mutate({ entryId: calledEntry.id, status: 'absent' });
+              markAbsent.mutate({ entryId: calledEntry.id });
             }
           }}
-          disabled={!calledEntry || updateStatus.isPending}
-          className="h-14 bg-amber-50 text-amber-800 text-base font-semibold rounded-xl
-                     active:bg-amber-100 disabled:opacity-40 transition-colors touch-manipulation"
+          disabled={!calledEntry || actionBusy}
+          className="h-16 bg-amber-500 text-white text-base font-bold rounded-2xl
+                     active:bg-amber-600 disabled:opacity-30 transition-colors touch-manipulation
+                     flex flex-col items-center justify-center gap-0.5"
         >
-          Ausente
+          <span className="text-xl">⚠</span>
+          <span>Ausente</span>
         </button>
 
         {/* Register new customer */}
@@ -139,6 +160,11 @@ export function OperatorPanel() {
           </div>
         )}
       </div>
+
+      {/* History modal */}
+      {showHistory && queueId && (
+        <HistoryModal queueId={queueId} onClose={() => setShowHistory(false)} />
+      )}
     </TabletLayout>
   );
 }

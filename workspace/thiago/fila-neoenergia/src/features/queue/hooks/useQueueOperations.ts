@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/shared/lib/supabase';
-import { useQueueActions } from '@/shared/stores/queueStore';
+import { useQueueStore, useQueueActions } from '@/shared/stores/queueStore';
 import type { QueueEntry, QueueStatus } from '@/shared/types';
 
 export function useMoveEntry(queueId: string | null) {
@@ -74,6 +74,14 @@ export function useUpdateStatus(queueId: string | null) {
       return data as QueueEntry;
     },
     onSuccess: (_, variables) => {
+      // Clear calledEntry if the finished/updated entry was the one being served
+      const state = useQueueStore.getState();
+      if (
+        variables.status === 'finished' &&
+        state.calledEntry?.id === variables.entryId
+      ) {
+        state.actions.setCalledEntry(null);
+      }
       queryClient.invalidateQueries({ queryKey: ['queue', queueId] });
       const labels: Record<QueueStatus, string> = {
         in_service: 'Em atendimento',
@@ -85,6 +93,31 @@ export function useUpdateStatus(queueId: string | null) {
     },
     onError: () => {
       toast.error('Erro ao atualizar status. Tente novamente.');
+    },
+  });
+}
+
+export function useMarkAbsent(queueId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ entryId }: { entryId: string }) => {
+      const { error } = await supabase.rpc('mark_absent', {
+        p_entry_id: entryId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, { entryId }) => {
+      // If this was the currently called entry, clear it and save as lastCalled
+      const state = useQueueStore.getState();
+      if (state.calledEntry?.id === entryId) {
+        state.actions.setCalledEntry(null);
+      }
+      queryClient.invalidateQueries({ queryKey: ['queue', queueId] });
+      toast.info('Cliente enviado para o final da fila.');
+    },
+    onError: () => {
+      toast.error('Erro ao marcar ausência. Tente novamente.');
     },
   });
 }

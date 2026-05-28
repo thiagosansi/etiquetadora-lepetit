@@ -5,6 +5,7 @@ import type { QueueEntry, SmsStatus, RealtimeQueuePayload } from '@/shared/types
 interface QueueState {
   entries: QueueEntry[];
   calledEntry: QueueEntry | null;
+  lastCalledEntry: QueueEntry | null;
   smsStatusMap: Record<string, SmsStatus>;
   actions: {
     setEntries: (entries: QueueEntry[]) => void;
@@ -18,6 +19,7 @@ interface QueueState {
 export const useQueueStore = create<QueueState>()((set) => ({
   entries: [],
   calledEntry: null,
+  lastCalledEntry: null,
   smsStatusMap: {},
 
   actions: {
@@ -57,7 +59,12 @@ export const useQueueStore = create<QueueState>()((set) => ({
         return state;
       }),
 
-    setCalledEntry: (entry) => set({ calledEntry: entry }),
+    // Saves the outgoing calledEntry as lastCalledEntry before replacing
+    setCalledEntry: (entry) =>
+      set((state) => ({
+        calledEntry: entry,
+        lastCalledEntry: entry !== null ? state.calledEntry : state.lastCalledEntry,
+      })),
 
     setSmsStatus: (entryId, status) =>
       set((state) => ({
@@ -88,6 +95,7 @@ export const useWaitingEntries = () =>
     ),
   );
 export const useCalledEntry = () => useQueueStore((s) => s.calledEntry);
+export const useLastCalledEntry = () => useQueueStore((s) => s.lastCalledEntry);
 export const useSmsStatus = (entryId: string) =>
   useQueueStore((s) => s.smsStatusMap[entryId]);
 export const useQueueActions = () => useQueueStore((s) => s.actions);

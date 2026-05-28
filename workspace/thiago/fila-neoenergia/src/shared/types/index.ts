@@ -20,6 +20,7 @@ export interface QueueEntry {
   served_at: string | null;
   finished_at: string | null;
   sms_sent: boolean;
+  was_absent: boolean;
   position: number | null;
   created_at: string;
   updated_at: string;
