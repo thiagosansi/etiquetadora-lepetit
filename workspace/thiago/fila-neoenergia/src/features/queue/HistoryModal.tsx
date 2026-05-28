@@ -115,8 +115,9 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
     const absent     = entries.filter(e => e.status === 'absent');
     const waiting    = entries.filter(e => e.status === 'waiting');
     const inService  = entries.filter(e => e.status === 'in_service');
-    const wasAbsent  = entries.filter(e => e.was_absent);
-    const smsSent    = entries.filter(e => e.sms_sent);
+    const wasAbsent          = entries.filter(e => e.was_absent);
+    const finishedSecondCall = entries.filter(e => e.was_absent && e.status === 'finished');
+    const smsSent            = entries.filter(e => e.sms_sent);
 
     const avg = (nums: number[]) =>
       nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
@@ -139,13 +140,14 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
       .sort((a, b) => b.count - a.count);
 
     return {
-      total:      entries.length,
-      finished:   finished.length,
-      absent:     absent.length,
-      waiting:    waiting.length,
-      inService:  inService.length,
-      wasAbsent:  wasAbsent.length,
-      smsSent:    smsSent.length,
+      total:               entries.length,
+      finished:            finished.length,
+      absent:              absent.length,
+      waiting:             waiting.length,
+      inService:           inService.length,
+      wasAbsent:           wasAbsent.length,
+      finishedSecondCall:  finishedSecondCall.length,
+      smsSent:             smsSent.length,
       avgWait:    avg(waitTimes),
       avgService: avg(serviceTimes),
       byOperator,
@@ -242,11 +244,20 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
             Status dos atendimentos
           </h3>
-          <StatBar label="Finalizados"      value={stats.finished}  total={stats.total} colorClass="bg-emerald-500" />
-          <StatBar label="Ausentes"         value={stats.absent}    total={stats.total} colorClass="bg-amber-400" />
-          <StatBar label="Aguardando"       value={stats.waiting}   total={stats.total} colorClass="bg-blue-400" />
-          <StatBar label="Em atendimento"   value={stats.inService} total={stats.total} colorClass="bg-green-500" />
-          <StatBar label="2º chamado (retorno)" value={stats.wasAbsent} total={stats.total} colorClass="bg-violet-400" />
+          <StatBar label="Finalizados"    value={stats.finished}  total={stats.total} colorClass="bg-emerald-500" />
+          {stats.finishedSecondCall > 0 && (
+            <div className="pl-6 -mt-1">
+              <StatBar
+                label="↳ 2º chamado"
+                value={stats.finishedSecondCall}
+                total={stats.finished}
+                colorClass="bg-violet-400"
+              />
+            </div>
+          )}
+          <StatBar label="Ausentes"       value={stats.absent}    total={stats.total} colorClass="bg-amber-400" />
+          <StatBar label="Aguardando"     value={stats.waiting}   total={stats.total} colorClass="bg-blue-400" />
+          <StatBar label="Em atendimento" value={stats.inService} total={stats.total} colorClass="bg-green-500" />
         </section>
 
         {/* By operator */}
