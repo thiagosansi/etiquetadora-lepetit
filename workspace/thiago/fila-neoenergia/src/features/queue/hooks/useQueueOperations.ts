@@ -24,8 +24,29 @@ export function useMoveEntry(queueId: string | null) {
   });
 }
 
+async function sendSmsForEntry(entryId: string, queueId: string): Promise<boolean> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const response = await fetch(`${supabaseUrl}/functions/v1/send-sms`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({
+      entry_id: entryId,
+      queue_id: queueId,
+      trigger: 'manual',
+      target_entry_id: entryId,
+    }),
+  });
+  if (!response.ok) return false;
+  const data = await response.json() as { sent: boolean };
+  return data.sent;
+}
+
 export function useCallNext(queueId: string | null) {
-  const { setCalledEntry } = useQueueActions();
+  const { setCalledEntry, setSmsStatus } = useQueueActions();
 
   return useMutation({
     mutationFn: async () => {
@@ -40,13 +61,23 @@ export function useCallNext(queueId: string | null) {
       if (!result?.called || !result.entry) return null;
       return result.entry;
     },
-    onSuccess: (entry) => {
+    onSuccess: async (entry) => {
       if (!entry) {
         toast.info('Fila vazia — nenhum cliente aguardando.');
         return;
       }
       setCalledEntry(entry);
       toast.success(`Chamando: ${entry.customer_name}`);
+
+      // Auto-send SMS
+      setSmsStatus(entry.id, 'sending');
+      try {
+        const sent = await sendSmsForEntry(entry.id, queueId!);
+        setSmsStatus(entry.id, sent ? 'sent' : 'failed');
+        if (!sent) toast.error('SMS não pôde ser enviado automaticamente.');
+      } catch {
+        setSmsStatus(entry.id, 'failed');
+      }
     },
     onError: () => {
       toast.error('Erro ao chamar próximo. Tente novamente.');
