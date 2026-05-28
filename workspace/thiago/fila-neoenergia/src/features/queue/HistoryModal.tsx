@@ -71,6 +71,9 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
                     <p className="font-semibold text-gray-800 truncate">{entry.customer_name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       Finalizado às {formatHour(entry.finished_at)}
+                      {entry.served_by && (
+                        <span className="ml-1.5 text-gray-500">· {entry.served_by}</span>
+                      )}
                     </p>
                   </div>
                   {entry.was_absent && (

@@ -85,7 +85,7 @@ export function useCallNext(queueId: string | null) {
   });
 }
 
-export function useUpdateStatus(queueId: string | null) {
+export function useUpdateStatus(queueId: string | null, operatorName?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -99,6 +99,7 @@ export function useUpdateStatus(queueId: string | null) {
       const { data, error } = await supabase.rpc('update_entry_status', {
         p_entry_id: entryId,
         p_status: status,
+        p_operator_name: operatorName ?? null,
       });
 
       if (error) throw error;

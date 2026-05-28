@@ -30,7 +30,7 @@ export function OperatorPanel() {
   const calledEntry = useCalledEntry();
 
   const callNext = useCallNext(queueId);
-  const updateStatus = useUpdateStatus(queueId);
+  const updateStatus = useUpdateStatus(queueId, operator?.name);
   const markAbsent = useMarkAbsent(queueId);
 
   const isLoading = queueLoading || entriesLoading;

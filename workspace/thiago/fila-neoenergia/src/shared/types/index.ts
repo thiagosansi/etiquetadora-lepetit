@@ -22,6 +22,7 @@ export interface QueueEntry {
   sms_sent: boolean;
   was_absent: boolean;
   position: number | null;
+  served_by: string | null;
   created_at: string;
   updated_at: string;
   version: number;
