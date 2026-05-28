@@ -246,7 +246,7 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
           <StatBar label="Ausentes"         value={stats.absent}    total={stats.total} colorClass="bg-amber-400" />
           <StatBar label="Aguardando"       value={stats.waiting}   total={stats.total} colorClass="bg-blue-400" />
           <StatBar label="Em atendimento"   value={stats.inService} total={stats.total} colorClass="bg-green-500" />
-          <StatBar label="Com ausência prévia" value={stats.wasAbsent} total={stats.total} colorClass="bg-orange-400" />
+          <StatBar label="2º chamado (retorno)" value={stats.wasAbsent} total={stats.total} colorClass="bg-violet-400" />
         </section>
 
         {/* By operator */}
@@ -330,8 +330,15 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[entry.status] ?? ''}`}>
                       {STATUS_LABELS[entry.status]}
                     </span>
-                    {entry.was_absent && (
-                      <span className="text-xs text-orange-400">⚠ ausência</span>
+                    {entry.was_absent && entry.status === 'finished' && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium text-violet-700 bg-violet-50">
+                        2º chamado
+                      </span>
+                    )}
+                    {entry.was_absent && entry.status !== 'finished' && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium text-orange-600 bg-orange-50">
+                        retorno
+                      </span>
                     )}
                     {entry.served_by && (
                       <span className="text-xs text-gray-400">{entry.served_by}</span>
