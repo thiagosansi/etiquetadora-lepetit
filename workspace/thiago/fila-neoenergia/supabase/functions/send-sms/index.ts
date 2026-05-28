@@ -13,14 +13,26 @@ interface WebhookPayload {
   target_entry_id?: string;
 }
 
-async function sendSmsViaTwilio(toPhone: string, message: string): Promise<boolean> {
+interface SmsResult {
+  sent: boolean;
+  error?: string;
+  twilio_status?: number;
+  twilio_body?: unknown;
+}
+
+async function sendSmsViaTwilio(toPhone: string, message: string): Promise<SmsResult> {
   const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
   const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
   const fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
 
   if (!accountSid || !authToken || !fromNumber) {
-    console.error('[send-sms] Missing Twilio env vars');
-    return false;
+    const missing = [
+      !accountSid && 'TWILIO_ACCOUNT_SID',
+      !authToken && 'TWILIO_AUTH_TOKEN',
+      !fromNumber && 'TWILIO_PHONE_NUMBER',
+    ].filter(Boolean).join(', ');
+    console.error(`[send-sms] Missing env vars: ${missing}`);
+    return { sent: false, error: `missing_env_vars: ${missing}` };
   }
 
   const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
@@ -40,18 +52,18 @@ async function sendSmsViaTwilio(toPhone: string, message: string): Promise<boole
       }),
     });
 
+    const body = await response.json();
+
     if (!response.ok) {
-      const err = await response.text();
-      console.error(`[send-sms] Twilio error ${response.status}: ${err}`);
-      return false;
+      console.error(`[send-sms] Twilio error ${response.status}:`, JSON.stringify(body));
+      return { sent: false, error: 'twilio_error', twilio_status: response.status, twilio_body: body };
     }
 
-    const data = await response.json();
-    console.log(`[send-sms] Sent to ${toPhone} — sid: ${data.sid}`);
-    return true;
+    console.log(`[send-sms] Sent to ${toPhone} — sid: ${body.sid}`);
+    return { sent: true };
   } catch (err) {
     console.error('[send-sms] Network error:', err);
-    return false;
+    return { sent: false, error: String(err) };
   }
 }
 
@@ -137,13 +149,13 @@ Deno.serve(async (req: Request) => {
     `Seu atendimento acontecera em aproximadamente 5 minutos no stand da NEOENERGIA do BAHIA FARM. ` +
     `Compareca ao local dentro desse prazo para nao perder sua vez.`;
 
-  const sent = await sendSmsViaTwilio(entry.phone, message);
+  const result = await sendSmsViaTwilio(entry.phone, message);
 
-  if (sent) {
+  if (result.sent) {
     await supabase.rpc('fila_mark_sms_sent', { p_entry_id: entry.id });
   }
 
-  return new Response(JSON.stringify({ sent, entry_id: entry.id }), {
+  return new Response(JSON.stringify({ ...result, entry_id: entry.id }), {
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
 });
