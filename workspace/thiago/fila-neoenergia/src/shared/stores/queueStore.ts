@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import type { QueueEntry, SmsStatus, RealtimeQueuePayload } from '@/shared/types';
 
 interface QueueState {
@@ -28,6 +29,8 @@ export const useQueueStore = create<QueueState>()((set) => ({
 
         if (event_type === 'INSERT') {
           const newEntry = entry as QueueEntry;
+          // Idempotent: skip if already in store (race between realtime + query refetch)
+          if (state.entries.some((e) => e.id === newEntry.id)) return state;
           return { entries: [...state.entries, newEntry] };
         }
 
@@ -72,7 +75,7 @@ export const useQueueStore = create<QueueState>()((set) => ({
 // Selector hooks (tkdodo pattern — avoid re-renders)
 export const useEntries = () => useQueueStore((s) => s.entries);
 export const useWaitingEntries = () =>
-  useQueueStore((s) => s.entries.filter((e) => e.status === 'waiting'));
+  useQueueStore(useShallow((s) => s.entries.filter((e) => e.status === 'waiting')));
 export const useCalledEntry = () => useQueueStore((s) => s.calledEntry);
 export const useSmsStatus = (entryId: string) =>
   useQueueStore((s) => s.smsStatusMap[entryId]);

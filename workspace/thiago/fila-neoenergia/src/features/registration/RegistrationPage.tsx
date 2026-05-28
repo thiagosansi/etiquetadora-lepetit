@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/shared/lib/supabase';
 import { formatPhoneE164 } from '@/shared/lib/utils';
@@ -18,7 +18,6 @@ const schema = z.object({
     .string()
     .regex(/^\d{10,11}$/, 'Telefone inválido — use DDD + número (ex: 71999887766)')
     .transform((v) => formatPhoneE164(v)),
-  scheduled_time: z.string().min(1, 'Horário é obrigatório'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -29,7 +28,6 @@ interface RegistrationPageProps {
 
 export function RegistrationPage({ queueId }: RegistrationPageProps) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   const {
     register,
@@ -46,14 +44,14 @@ export function RegistrationPage({ queueId }: RegistrationPageProps) {
         p_queue_id: queueId,
         p_name: data.customer_name,
         p_phone: data.phone,
-        p_scheduled_time: data.scheduled_time,
+        // p_scheduled_time omitted — DB defaults to now()::time
       });
 
       if (error) throw error;
       return entry;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['queue', queueId] });
+      // No invalidateQueries — Realtime INSERT event updates the store automatically
       toast.success('Cliente cadastrado na fila!');
       reset();
       navigate('/');
@@ -127,27 +125,6 @@ export function RegistrationPage({ queueId }: RegistrationPageProps) {
             {errors.phone && (
               <p role="alert" className="text-red-600 text-sm">
                 {errors.phone.message}
-              </p>
-            )}
-          </div>
-
-          {/* Time */}
-          <div className="flex flex-col gap-2">
-            <label htmlFor="scheduled_time" className="text-base font-semibold text-gray-700">
-              Horário <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="scheduled_time"
-              type="time"
-              {...register('scheduled_time')}
-              className="h-14 px-4 text-lg border-2 border-gray-200 rounded-xl
-                         focus:border-blue-500 focus:outline-none transition-colors
-                         disabled:opacity-50"
-              disabled={mutation.isPending}
-            />
-            {errors.scheduled_time && (
-              <p role="alert" className="text-red-600 text-sm">
-                {errors.scheduled_time.message}
               </p>
             )}
           </div>

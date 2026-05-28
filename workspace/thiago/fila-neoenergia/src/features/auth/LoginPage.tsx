@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/shared/lib/supabase';
 import { useAuthActions } from '@/shared/stores/authStore';
 import { TabletLayout } from '@/shared/components/TabletLayout';
+import { LOGO_SRC } from '@/assets/logo';
 
 const PIN_LENGTH = 4;
 
@@ -32,15 +33,15 @@ export function LoginPage() {
 
       if (rpcError) throw rpcError;
 
-      if (!data) {
+      const result = data as { authenticated: boolean; operator?: { id: string; name: string } };
+      if (!result?.authenticated || !result.operator) {
         setError('PIN inválido. Tente novamente.');
         setPin('');
         inputRef.current?.focus();
         return;
       }
 
-      const operator = data as { id: string; name: string };
-      login(operator);
+      login(result.operator);
       navigate('/');
     } catch {
       setError('Erro ao conectar. Verifique sua conexão.');
@@ -62,10 +63,10 @@ export function LoginPage() {
     <TabletLayout className="items-center justify-center">
       <div className="w-full max-w-sm px-6 py-12 flex flex-col items-center gap-8">
         {/* Logo / Event */}
-        <div className="text-center">
-          <div className="text-4xl font-black text-blue-700 tracking-tight">NEOENERGIA</div>
-          <div className="text-lg text-gray-500 font-medium mt-1">BAHIA FARM 2026</div>
-          <div className="text-sm text-gray-400 mt-3">Atendimento ao Cliente</div>
+        <div className="text-center flex flex-col items-center gap-3">
+          <img src={LOGO_SRC} alt="NEOENERGIA" className="w-56 object-contain" />
+          <div className="text-lg text-gray-500 font-medium">BAHIA FARM 2026</div>
+          <div className="text-sm text-gray-400">Atendimento ao Cliente</div>
         </div>
 
         {/* PIN Display */}

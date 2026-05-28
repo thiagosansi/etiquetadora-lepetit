@@ -38,5 +38,4 @@ export interface RealtimeQueuePayload {
 export interface RegistrationFormData {
   customer_name: string;
   phone: string;
-  scheduled_time: string;
 }

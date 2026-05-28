@@ -16,9 +16,9 @@ export function useCallNext(queueId: string | null) {
       });
 
       if (error) throw error;
-      const entries = data as QueueEntry[];
-      if (!entries || entries.length === 0) return null;
-      return entries[0];
+      const result = data as { called: boolean; entry?: QueueEntry; reason?: string };
+      if (!result?.called || !result.entry) return null;
+      return result.entry;
     },
     onSuccess: (entry) => {
       if (!entry) {
