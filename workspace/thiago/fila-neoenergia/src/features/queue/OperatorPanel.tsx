@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCallNext, useUpdateStatus, useMarkAbsent } from './hooks/useQueueOperations';
 import { useQueueData, useGetOrCreateQueue } from './hooks/useQueueData';
 import { useQueueRealtime } from './hooks/useQueueRealtime';
-import { useWaitingEntries, useCalledEntry } from '@/shared/stores/queueStore';
+import { useWaitingEntries, useCalledEntry, useInServiceEntries } from '@/shared/stores/queueStore';
 import { useOperator, useAuthActions } from '@/shared/stores/authStore';
 import { CallingDisplay } from './CallingDisplay';
 import { QueueCard } from './QueueCard';
@@ -26,6 +26,7 @@ export function OperatorPanel() {
   useQueueRealtime(queueId);
 
   const waitingEntries = useWaitingEntries();
+  const inServiceEntries = useInServiceEntries();
   const calledEntry = useCalledEntry();
 
   const callNext = useCallNext(queueId);
@@ -137,26 +138,49 @@ export function OperatorPanel() {
       <div className="flex-1 overflow-y-auto px-4 pb-6">
         {isLoading ? (
           <div className="py-8 text-center text-gray-400">Carregando fila...</div>
-        ) : waitingEntries.length === 0 ? (
-          <div className="py-8 text-center">
-            <p className="text-gray-400 text-lg">Fila vazia</p>
-            <p className="text-gray-300 text-sm mt-1">Registre um cliente para começar</p>
-          </div>
         ) : (
           <div className="flex flex-col gap-2">
-            <p className="text-xs text-gray-400 font-medium py-2">
-              {waitingEntries.length} cliente{waitingEntries.length !== 1 ? 's' : ''} aguardando
-            </p>
-            {waitingEntries.map((entry, index) => (
-              <QueueCard
-                key={entry.id}
-                entry={entry}
-                position={index + 1}
-                queueId={queueId!}
-                isFirst={index === 0}
-                isLast={index === waitingEntries.length - 1}
-              />
-            ))}
+
+            {/* In-service section */}
+            {inServiceEntries.length > 0 && (
+              <>
+                <p className="text-xs font-semibold text-green-700 uppercase tracking-wider pt-3 pb-1">
+                  Em atendimento
+                </p>
+                {inServiceEntries.map((entry) => (
+                  <QueueCard
+                    key={entry.id}
+                    entry={entry}
+                    queueId={queueId!}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* Waiting section */}
+            {waitingEntries.length === 0 && inServiceEntries.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-gray-400 text-lg">Fila vazia</p>
+                <p className="text-gray-300 text-sm mt-1">Registre um cliente para começar</p>
+              </div>
+            ) : waitingEntries.length > 0 ? (
+              <>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 pb-1">
+                  Aguardando · {waitingEntries.length}
+                </p>
+                {waitingEntries.map((entry, index) => (
+                  <QueueCard
+                    key={entry.id}
+                    entry={entry}
+                    position={index + 1}
+                    queueId={queueId!}
+                    isFirst={index === 0}
+                    isLast={index === waitingEntries.length - 1}
+                  />
+                ))}
+              </>
+            ) : null}
+
           </div>
         )}
       </div>

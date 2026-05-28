@@ -96,6 +96,8 @@ export const useWaitingEntries = () =>
   );
 export const useCalledEntry = () => useQueueStore((s) => s.calledEntry);
 export const useLastCalledEntry = () => useQueueStore((s) => s.lastCalledEntry);
+export const useInServiceEntries = () =>
+  useQueueStore(useShallow((s) => s.entries.filter((e) => e.status === 'in_service')));
 export const useSmsStatus = (entryId: string) =>
   useQueueStore((s) => s.smsStatusMap[entryId]);
 export const useQueueActions = () => useQueueStore((s) => s.actions);
