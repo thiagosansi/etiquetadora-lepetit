@@ -15,6 +15,7 @@ const makeEntry = (overrides: Partial<QueueEntry> = {}): QueueEntry => ({
   sms_sent: false,
   was_absent: false,
   position: null,
+  served_by: null,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   version: 0,
