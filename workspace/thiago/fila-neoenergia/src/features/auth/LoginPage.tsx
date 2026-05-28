@@ -8,20 +8,23 @@ import { LOGO_SRC } from '@/assets/logo';
 const PIN_LENGTH = 4;
 
 export function LoginPage() {
+  const [name, setName] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { login } = useAuthActions();
 
+  const nameOk = name.trim().length >= 2;
+
   useEffect(() => {
-    inputRef.current?.focus();
+    nameRef.current?.focus();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (pin.length < PIN_LENGTH) return;
+    if (!nameOk || pin.length < PIN_LENGTH) return;
 
     setLoading(true);
     setError('');
@@ -35,13 +38,13 @@ export function LoginPage() {
 
       const result = data as { authenticated: boolean; operator?: { id: string; name: string } };
       if (!result?.authenticated || !result.operator) {
-        setError('PIN inválido. Tente novamente.');
+        setError('Senha inválida. Tente novamente.');
         setPin('');
-        inputRef.current?.focus();
         return;
       }
 
-      login(result.operator);
+      // Use the name the attendant typed, not the DB name
+      login({ ...result.operator, name: name.trim() });
       navigate('/');
     } catch {
       setError('Erro ao conectar. Verifique sua conexão.');
@@ -52,9 +55,15 @@ export function LoginPage() {
   }
 
   function handlePinChange(value: string) {
+    if (!nameOk) return;
     const digits = value.replace(/\D/g, '').slice(0, PIN_LENGTH);
     setPin(digits);
     setError('');
+  }
+
+  function handleDigit(n: number) {
+    if (!nameOk || pin.length >= PIN_LENGTH || loading) return;
+    handlePinChange(pin + n);
   }
 
   const dots = Array.from({ length: PIN_LENGTH }, (_, i) => i);
@@ -69,26 +78,46 @@ export function LoginPage() {
           <div className="text-sm text-gray-400">Atendimento ao Cliente</div>
         </div>
 
-        {/* PIN Display */}
-        <div className="flex gap-4" aria-hidden="true">
-          {dots.map((i) => (
-            <div
-              key={i}
-              className={`w-5 h-5 rounded-full transition-all duration-150 ${
-                i < pin.length ? 'bg-blue-600 scale-110' : 'bg-gray-300'
-              }`}
+        <form onSubmit={handleSubmit} className="w-full flex flex-col items-center gap-6">
+          {/* Name field */}
+          <div className="w-full flex flex-col gap-1.5">
+            <label htmlFor="name-input" className="text-sm font-medium text-gray-600">
+              Seu nome
+            </label>
+            <input
+              id="name-input"
+              ref={nameRef}
+              type="text"
+              value={name}
+              onChange={(e) => { setName(e.target.value); setError(''); setPin(''); }}
+              placeholder="Digite seu nome"
+              autoComplete="off"
+              className="w-full h-14 px-4 text-lg border border-gray-300 rounded-xl
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-          ))}
-        </div>
+          </div>
 
-        {/* Hidden input for PIN */}
-        <form onSubmit={handleSubmit} className="w-full flex flex-col items-center gap-4">
-          <label className="sr-only" htmlFor="pin-input">
-            Digite seu PIN de operador
-          </label>
+          {/* PIN Display */}
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm font-medium text-gray-600">Senha</span>
+            <div className="flex gap-4" aria-hidden="true">
+              {dots.map((i) => (
+                <div
+                  key={i}
+                  className={`w-5 h-5 rounded-full transition-all duration-150 ${
+                    !nameOk
+                      ? 'bg-gray-200'
+                      : i < pin.length
+                        ? 'bg-blue-600 scale-110'
+                        : 'bg-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Hidden input for PIN (keyboard fallback) */}
           <input
-            id="pin-input"
-            ref={inputRef}
             type="password"
             inputMode="numeric"
             pattern="[0-9]*"
@@ -96,13 +125,14 @@ export function LoginPage() {
             value={pin}
             onChange={(e) => handlePinChange(e.target.value)}
             className="opacity-0 absolute w-0 h-0"
+            aria-label="Senha numérica"
             autoComplete="off"
-            aria-label="PIN de operador"
+            disabled={!nameOk}
           />
 
           {/* Error message */}
           {error && (
-            <p role="alert" className="text-red-600 text-base font-medium text-center">
+            <p role="alert" className="text-red-600 text-base font-medium text-center -mt-2">
               {error}
             </p>
           )}
@@ -110,7 +140,7 @@ export function LoginPage() {
           {/* Submit button */}
           <button
             type="submit"
-            disabled={pin.length < PIN_LENGTH || loading}
+            disabled={!nameOk || pin.length < PIN_LENGTH || loading}
             className="w-full h-16 bg-blue-600 text-white text-xl font-bold rounded-2xl
                        active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed
                        transition-all duration-150 touch-manipulation"
@@ -119,13 +149,13 @@ export function LoginPage() {
           </button>
         </form>
 
-        {/* Numpad (for tablets without physical keyboard) */}
-        <div className="grid grid-cols-3 gap-3 w-full">
+        {/* Numpad */}
+        <div className={`grid grid-cols-3 gap-3 w-full transition-opacity ${!nameOk ? 'opacity-30 pointer-events-none' : ''}`}>
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
             <button
               key={n}
               type="button"
-              onClick={() => handlePinChange(pin + n)}
+              onClick={() => handleDigit(n)}
               disabled={loading}
               className="h-16 text-2xl font-semibold bg-white rounded-2xl shadow-sm
                          border border-gray-200 active:bg-gray-100 transition-colors
@@ -134,11 +164,10 @@ export function LoginPage() {
               {n}
             </button>
           ))}
-          {/* Empty cell */}
           <div />
           <button
             type="button"
-            onClick={() => handlePinChange(pin + '0')}
+            onClick={() => handleDigit(0)}
             disabled={loading}
             className="h-16 text-2xl font-semibold bg-white rounded-2xl shadow-sm
                        border border-gray-200 active:bg-gray-100 transition-colors
@@ -146,7 +175,6 @@ export function LoginPage() {
           >
             0
           </button>
-          {/* Backspace */}
           <button
             type="button"
             onClick={() => setPin((p) => p.slice(0, -1))}
