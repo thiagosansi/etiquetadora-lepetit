@@ -1,0 +1,19 @@
+{
+  "unit_tests": true,
+  "tdd": true,
+  "bdd": true,
+  "e2e_cypress": true,
+  "docker": true,
+  "auth": true,
+  "nextjs_app_router": true,
+  "supabase": true,
+  "agent_browser": true,
+  "structured_logging": true,
+  "hexagonal": false,
+  "feature_based": false,
+  "ci_cd": false,
+  "rate_limiting": false,
+  "observability": false,
+  "load_tests": false,
+  "multi_tenancy": false
+}

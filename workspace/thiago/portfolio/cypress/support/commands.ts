@@ -1,0 +1,2 @@
+// Custom Cypress commands
+export {}
