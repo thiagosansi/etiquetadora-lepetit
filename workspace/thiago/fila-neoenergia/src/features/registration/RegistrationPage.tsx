@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/shared/lib/supabase';
 import { formatPhoneE164 } from '@/shared/lib/utils';
@@ -28,6 +28,7 @@ interface RegistrationPageProps {
 
 export function RegistrationPage({ queueId }: RegistrationPageProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const {
     register,
@@ -51,7 +52,9 @@ export function RegistrationPage({ queueId }: RegistrationPageProps) {
       return entry;
     },
     onSuccess: () => {
-      // No invalidateQueries — Realtime INSERT event updates the store automatically
+      // Invalidate so OperatorPanel refetches on mount (Realtime may be inactive while on /register)
+      // The idempotent INSERT check in the store prevents duplicates if Realtime also fires
+      queryClient.invalidateQueries({ queryKey: ['queue', queueId] });
       toast.success('Cliente cadastrado na fila!');
       reset();
       navigate('/');
