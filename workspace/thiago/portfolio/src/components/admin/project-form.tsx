@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { ImagePicker } from '@/components/admin/image-picker'
 import type { Project } from '@/types/database'
 import { toast } from 'sonner'
 
@@ -19,6 +20,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
   const router = useRouter()
   const [slug, setSlug] = useState(project?.slug ?? '')
   const [builtWith, setBuiltWith] = useState(project?.built_with?.join(', ') ?? '')
+  const [coverImage, setCoverImage] = useState<string | null>(project?.cover_image ?? null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -39,7 +41,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
       status: (formData.get('status') as 'draft' | 'published') ?? 'draft',
       featured: formData.get('featured') === 'on',
       sort_order: Number(formData.get('sort_order') ?? 0),
-      cover_image: null,
+      cover_image: coverImage,
     }
 
     try {
@@ -89,6 +91,11 @@ export function ProjectForm({ project }: ProjectFormProps) {
       <div className="space-y-2">
         <Label htmlFor="tagline">Tagline</Label>
         <Input id="tagline" name="tagline" defaultValue={project?.tagline ?? ''} placeholder="Uma frase sobre o produto" />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Imagem de capa</Label>
+        <ImagePicker value={coverImage} onChange={setCoverImage} />
       </div>
 
       <div className="space-y-2">
