@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/shared/lib/supabase';
 import { maskPhone } from '@/shared/lib/utils';
-import type { QueueEntry, QueueStatus } from '@/shared/types';
+import type { QueueEntry, QueueStatus, Queue } from '@/shared/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -25,6 +25,68 @@ function fmtHour(iso: string | null): string {
 
 function fmtDateTime(d: Date): string {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function fmtDate(dateStr: string): string {
+  // dateStr is YYYY-MM-DD
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ── CSV export ─────────────────────────────────────────────────────────────
+
+function csvCell(v: string | number | null | undefined): string {
+  const s = String(v ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function exportToCSV(entries: QueueEntry[], dateLabel: string) {
+  const headers = [
+    '#', 'Nome', 'Telefone', 'Status', 'Atendente',
+    '2º Chamado', 'SMS Enviado',
+    'Cadastro', 'Chamada', 'Finalização',
+    'Espera (min)', 'Atendimento (min)',
+  ];
+
+  const STATUS_PT: Record<string, string> = {
+    finished: 'Finalizado', waiting: 'Aguardando',
+    in_service: 'Em atendimento', absent: 'Ausente',
+  };
+
+  const rows = entries.map((e, i) => {
+    const wait    = diffMinutes(e.created_at, e.called_at);
+    const service = diffMinutes(e.called_at, e.finished_at);
+    return [
+      i + 1,
+      e.customer_name,
+      maskPhone(e.phone),
+      STATUS_PT[e.status] ?? e.status,
+      e.served_by ?? '',
+      e.was_absent && e.status === 'finished' ? 'Sim' : '',
+      e.sms_sent ? 'Sim' : 'Não',
+      fmtHour(e.created_at),
+      fmtHour(e.called_at),
+      fmtHour(e.finished_at),
+      wait    !== null ? Math.round(wait)    : '',
+      service !== null ? Math.round(service) : '',
+    ].map(csvCell).join(',');
+  });
+
+  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `atendimentos-${dateLabel}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
@@ -87,37 +149,61 @@ interface HistoryModalProps {
 }
 
 export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [statusFilter, setStatusFilter]     = useState<StatusFilter>('all');
-  const [operatorFilter, setOperatorFilter] = useState<string>('all');
+  const [selectedQueueId, setSelectedQueueId] = useState<string>(queueId);
+  const [lastUpdated, setLastUpdated]         = useState<Date | null>(null);
+  const [statusFilter, setStatusFilter]       = useState<StatusFilter>('all');
+  const [operatorFilter, setOperatorFilter]   = useState<string>('all');
 
+  // ── All queues (for day selector) ───────────────────────────────────────
+  const { data: queues = [] } = useQuery({
+    queryKey: ['all-queues'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('queues')
+        .select('id, name, date')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Pick<Queue, 'id' | 'name' | 'date'>[];
+    },
+    staleTime: 60_000 * 60,
+  });
+
+  const selectedQueue = queues.find(q => q.id === selectedQueueId);
+
+  // ── Entries for selected day ─────────────────────────────────────────────
   const { data: entries = [], isFetching, refetch } = useQuery({
-    queryKey: ['dashboard', queueId],
+    queryKey: ['dashboard', selectedQueueId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('queue_entries')
         .select('*')
-        .eq('queue_id', queueId)
+        .eq('queue_id', selectedQueueId)
         .order('created_at', { ascending: true });
       if (error) throw error;
       setLastUpdated(new Date());
       return (data ?? []) as QueueEntry[];
     },
-    staleTime: Infinity,        // only refreshes manually
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
 
   const handleRefresh = useCallback(() => { refetch(); }, [refetch]);
 
+  const handleDayChange = useCallback((id: string) => {
+    setSelectedQueueId(id);
+    setStatusFilter('all');
+    setOperatorFilter('all');
+    setLastUpdated(null);
+  }, []);
+
   // ── Derived metrics ──────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const finished   = entries.filter(e => e.status === 'finished');
-    const absent     = entries.filter(e => e.status === 'absent');
-    const waiting    = entries.filter(e => e.status === 'waiting');
-    const inService  = entries.filter(e => e.status === 'in_service');
-    const wasAbsent          = entries.filter(e => e.was_absent);
+    const finished          = entries.filter(e => e.status === 'finished');
+    const absent            = entries.filter(e => e.status === 'absent');
+    const waiting           = entries.filter(e => e.status === 'waiting');
+    const inService         = entries.filter(e => e.status === 'in_service');
     const finishedSecondCall = entries.filter(e => e.was_absent && e.status === 'finished');
-    const smsSent            = entries.filter(e => e.sms_sent);
+    const smsSent           = entries.filter(e => e.sms_sent);
 
     const avg = (nums: number[]) =>
       nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
@@ -145,7 +231,6 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
       absent:              absent.length,
       waiting:             waiting.length,
       inService:           inService.length,
-      wasAbsent:           wasAbsent.length,
       finishedSecondCall:  finishedSecondCall.length,
       smsSent:             smsSent.length,
       avgWait:    avg(waitTimes),
@@ -166,18 +251,37 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
   const pct = (n: number) =>
     stats.total > 0 ? `${Math.round((n / stats.total) * 100)}% do total` : undefined;
 
+  const today = todayIso();
+
   return (
     <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col">
 
       {/* ── Header ── */}
       <header className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3
                          flex items-center gap-3 shadow-sm">
-        <h2 className="text-lg font-bold text-gray-900 flex-1">Dashboard</h2>
+        <h2 className="text-lg font-bold text-gray-900">Dashboard</h2>
+
+        {/* Day selector */}
+        <select
+          value={selectedQueueId}
+          onChange={e => handleDayChange(e.target.value)}
+          className="flex-1 min-w-0 text-sm border border-gray-200 rounded-xl px-3 py-2 bg-gray-50
+                     text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {queues.map(q => (
+            <option key={q.id} value={q.id}>
+              {fmtDate(q.date)}{q.date === today ? ' (hoje)' : ''}
+            </option>
+          ))}
+          {queues.length === 0 && (
+            <option value={queueId}>Hoje</option>
+          )}
+        </select>
 
         <div className="flex items-center gap-2 flex-shrink-0">
           {lastUpdated && (
-            <span className="text-xs text-gray-400 hidden sm:block">
-              Atualizado às {fmtDateTime(lastUpdated)}
+            <span className="text-xs text-gray-400 hidden md:block">
+              {fmtDateTime(lastUpdated)}
             </span>
           )}
           <button
@@ -189,7 +293,7 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
                        flex items-center gap-1.5 transition-colors"
           >
             <span className={isFetching ? 'inline-block animate-spin' : ''}>↻</span>
-            Atualizar
+            <span className="hidden sm:inline">Atualizar</span>
           </button>
           <button
             type="button"
@@ -203,12 +307,10 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
         </div>
       </header>
 
-      {/* Last updated — mobile only */}
+      {/* Last updated — mobile */}
       {lastUpdated && (
-        <div className="sm:hidden bg-white border-b border-gray-100 px-4 py-1.5">
-          <span className="text-xs text-gray-400">
-            Atualizado às {fmtDateTime(lastUpdated)}
-          </span>
+        <div className="md:hidden bg-white border-b border-gray-100 px-4 py-1.5">
+          <span className="text-xs text-gray-400">Atualizado às {fmtDateTime(lastUpdated)}</span>
         </div>
       )}
 
@@ -217,8 +319,8 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
 
         {/* KPI row 1 */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <KpiCard label="Total cadastrado"  value={stats.total} />
-          <KpiCard label="Finalizados"  value={stats.finished}
+          <KpiCard label="Total cadastrado" value={stats.total} />
+          <KpiCard label="Finalizados" value={stats.finished}
             sub={pct(stats.finished)} color="text-emerald-600" />
           <KpiCard label="Ausentes" value={stats.absent}
             sub={pct(stats.absent)} color="text-amber-500" />
@@ -282,10 +384,9 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Clientes{' '}
-              <span className="normal-case font-normal">({filteredEntries.length})</span>
+              Clientes <span className="normal-case font-normal">({filteredEntries.length})</span>
             </h3>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-center">
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value as StatusFilter)}
@@ -311,6 +412,20 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
                     <option key={op} value={op}>{op}</option>
                   ))}
                 </select>
+              )}
+
+              {filteredEntries.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    exportToCSV(filteredEntries, selectedQueue?.date ?? today)
+                  }
+                  className="h-9 px-3 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-xl
+                             active:bg-emerald-100 touch-manipulation transition-colors
+                             flex items-center gap-1.5"
+                >
+                  <span>↓</span> Excel
+                </button>
               )}
             </div>
           </div>
