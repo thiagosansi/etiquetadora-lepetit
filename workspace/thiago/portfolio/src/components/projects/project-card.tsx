@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { TechBadge } from '@/components/projects/tech-badge'
+import { getStoragePublicUrl } from '@/lib/utils'
 import type { Project } from '@/types/database'
 
 interface ProjectCardProps {
@@ -27,11 +28,12 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
           {project.cover_image && (
             <div className="relative aspect-video overflow-hidden">
               <Image
-                src={project.cover_image}
+                src={getStoragePublicUrl('portfolio', project.cover_image)}
                 alt={project.title}
                 fill
                 className="object-cover transition-transform duration-300 group-hover:scale-105"
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                unoptimized
               />
             </div>
           )}

@@ -35,7 +35,7 @@ export function HeroSection() {
     <div className="flex flex-col items-start gap-6">
       <div className="space-y-3">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-          Thiago Santos
+          Thiago Silva
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl">
           Construo produtos digitais com Inteligência Artificial — de ideias a produtos funcionais,

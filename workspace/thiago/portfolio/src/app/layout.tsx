@@ -8,14 +8,14 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
   title: {
-    default: 'Portfólio — Thiago Santos',
-    template: '%s | Thiago Santos',
+    default: 'Portfólio — Thiago Silva',
+    template: '%s | Thiago Silva',
   },
   description: 'Projetos de produtos digitais construídos com Inteligência Artificial.',
   openGraph: {
     type: 'website',
     locale: 'pt_BR',
-    siteName: 'Thiago Santos — Portfolio',
+    siteName: 'Thiago Silva — Portfolio',
   },
 }
 
