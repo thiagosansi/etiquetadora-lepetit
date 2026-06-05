@@ -146,8 +146,8 @@ Deno.serve(async (req: Request) => {
 
   const message =
     `Ola, ${entry.customer_name}! ` +
-    `Seu atendimento acontecera em aproximadamente 5 minutos no stand da NEOENERGIA do BAHIA FARM. ` +
-    `Compareca ao local dentro desse prazo para nao perder sua vez.`;
+    `Seu atendimento sera realizado em ate 5 minutos no estande da Neoenergia Coelba, na Bahia Farm. ` +
+    `Compareca dentro desse prazo para nao perder sua vez.`;
 
   const result = await sendSmsViaTwilio(entry.phone, message);
 
