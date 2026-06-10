@@ -39,9 +39,12 @@ function todayIso(): string {
 
 // ── CSV export ─────────────────────────────────────────────────────────────
 
+// Brazilian Excel uses semicolon as CSV separator (comma is the decimal separator)
+const SEP = ';';
+
 function csvCell(v: string | number | null | undefined): string {
   const s = String(v ?? '');
-  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+  if (s.includes(SEP) || s.includes('"') || s.includes('\n')) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;
@@ -76,10 +79,10 @@ function exportToCSV(entries: QueueEntry[], dateLabel: string) {
       fmtHour(e.finished_at),
       wait    !== null ? Math.round(wait)    : '',
       service !== null ? Math.round(service) : '',
-    ].map(csvCell).join(',');
+    ].map(csvCell).join(SEP);
   });
 
-  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+  const csv = '\uFEFF' + [headers.join(SEP), ...rows].join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -87,6 +90,54 @@ function exportToCSV(entries: QueueEntry[], dateLabel: string) {
   a.download = `atendimentos-${dateLabel}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── PDF export ─────────────────────────────────────────────────────────────
+
+function exportToPDF(entries: QueueEntry[], dateLabel: string) {
+  const rows = entries
+    .map((e, i) =>
+      `<tr>
+        <td>${i + 1}</td>
+        <td>${e.customer_name}</td>
+        <td>${maskPhone(e.phone)}</td>
+      </tr>`
+    )
+    .join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Clientes — ${dateLabel}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; margin: 24px; color: #111; }
+    h1   { font-size: 16px; margin-bottom: 4px; }
+    p    { color: #555; font-size: 12px; margin: 0 0 16px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    th { background: #f0f0f0; font-weight: 600; }
+    tr:nth-child(even) td { background: #fafafa; }
+    @media print { body { margin: 16px; } }
+  </style>
+</head>
+<body>
+  <h1>Lista de clientes — ${dateLabel}</h1>
+  <p>${entries.length} cliente(s) • gerado em ${new Date().toLocaleString('pt-BR')}</p>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Nome</th><th>Contato</th></tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
@@ -415,17 +466,30 @@ export function HistoryModal({ queueId, onClose }: HistoryModalProps) {
               )}
 
               {filteredEntries.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    exportToCSV(filteredEntries, selectedQueue?.date ?? today)
-                  }
-                  className="h-9 px-3 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-xl
-                             active:bg-emerald-100 touch-manipulation transition-colors
-                             flex items-center gap-1.5"
-                >
-                  <span>↓</span> Excel
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      exportToCSV(filteredEntries, selectedQueue?.date ?? today)
+                    }
+                    className="h-9 px-3 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-xl
+                               active:bg-emerald-100 touch-manipulation transition-colors
+                               flex items-center gap-1.5"
+                  >
+                    <span>↓</span> Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      exportToPDF(filteredEntries, selectedQueue?.date ?? today)
+                    }
+                    className="h-9 px-3 text-sm font-medium text-rose-700 bg-rose-50 rounded-xl
+                               active:bg-rose-100 touch-manipulation transition-colors
+                               flex items-center gap-1.5"
+                  >
+                    <span>↓</span> PDF
+                  </button>
+                </>
               )}
             </div>
           </div>
