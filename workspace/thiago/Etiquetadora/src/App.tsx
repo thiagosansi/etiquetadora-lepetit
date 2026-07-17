@@ -104,11 +104,11 @@ function parseOffsetMm(raw: string): number {
   return clampOffsetMm(Number.parseFloat(raw.replace(",", ".")));
 }
 
-function readStoredOffset(key: string): string {
+function readStoredOffset(key: string, fallback = "0"): string {
   try {
-    return localStorage.getItem(key) ?? "0";
+    return localStorage.getItem(key) ?? fallback;
   } catch {
-    return "0";
+    return fallback;
   }
 }
 
@@ -279,6 +279,9 @@ export default function App() {
   );
   const [printOffsetY, setPrintOffsetY] = useState<string>(() =>
     readStoredOffset("print-offset-y-mm")
+  );
+  const [printScalePct, setPrintScalePct] = useState<string>(() =>
+    readStoredOffset("print-content-scale-pct", "96")
   );
 
   const [sabor, setSabor] = useState(DEFAULT_FLAVOR);
@@ -579,6 +582,8 @@ const dataUrl = await toPng(exportNode, {
       const pdf = await buildLabelsPdf(sheets, {
         offsetXMm: parseOffsetMm(printOffsetX),
         offsetYMm: parseOffsetMm(printOffsetY),
+        contentScale:
+          Number.parseFloat(printScalePct.replace(",", ".")) / 100,
       });
       pdf.autoPrint();
       const blobUrl = pdf.output("bloburl").toString();
@@ -1187,9 +1192,9 @@ const dataUrl = await toPng(exportNode, {
 
                 <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
                   <p className="mb-2 text-sm font-medium text-neutral-800">
-                    Calibração da impressão (mm)
+                    Calibração da impressão
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
                       <Label
                         htmlFor="print-offset-x"
@@ -1230,6 +1235,31 @@ const dataUrl = await toPng(exportNode, {
                         onChange={(event) => {
                           setPrintOffsetY(event.target.value);
                           storeOffset("print-offset-y-mm", event.target.value);
+                        }}
+                        className="mt-1 rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <Label
+                        htmlFor="print-content-scale"
+                        className="text-xs text-neutral-600"
+                      >
+                        Escala do conteúdo (%)
+                      </Label>
+                      <Input
+                        id="print-content-scale"
+                        type="number"
+                        inputMode="numeric"
+                        step={1}
+                        min={85}
+                        max={100}
+                        value={printScalePct}
+                        onChange={(event) => {
+                          setPrintScalePct(event.target.value);
+                          storeOffset(
+                            "print-content-scale-pct",
+                            event.target.value
+                          );
                         }}
                         className="mt-1 rounded-xl"
                       />

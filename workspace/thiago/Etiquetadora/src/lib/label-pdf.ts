@@ -53,10 +53,43 @@ export type SheetRenderer = (sheet: HTMLElement) => Promise<string>;
 /** Max calibration offset. Larger values would push content off the label. */
 export const MAX_OFFSET_MM = 15;
 
+/**
+ * Default content scale. Physical printers clip content near the paper edge
+ * (their printable area is smaller than the paper), so the sheet image is
+ * shrunk slightly and centered on the page — this mirrors the "fit to page"
+ * behavior of the old print flow, which produced usable labels.
+ */
+export const DEFAULT_CONTENT_SCALE = 0.96;
+export const MIN_CONTENT_SCALE = 0.85;
+export const MAX_CONTENT_SCALE = 1;
+
 /** Clamps a calibration offset to [-15, 15]mm; invalid input becomes 0. */
 export function clampOffsetMm(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(MAX_OFFSET_MM, Math.max(-MAX_OFFSET_MM, value));
+}
+
+/** Clamps content scale to [0.85, 1]; invalid input falls back to default. */
+export function clampContentScale(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_CONTENT_SCALE;
+  return Math.min(MAX_CONTENT_SCALE, Math.max(MIN_CONTENT_SCALE, value));
+}
+
+/** Computes the centered, offset placement of the sheet image on the page. */
+export function computeImagePlacement(
+  offsetXMm: number,
+  offsetYMm: number,
+  contentScale: number
+): { x: number; y: number; width: number; height: number } {
+  const scale = clampContentScale(contentScale);
+  const width = SHEET_WIDTH_MM * scale;
+  const height = SHEET_HEIGHT_MM * scale;
+  return {
+    x: clampOffsetMm(offsetXMm) + (SHEET_WIDTH_MM - width) / 2,
+    y: clampOffsetMm(offsetYMm) + (SHEET_HEIGHT_MM - height) / 2,
+    width,
+    height,
+  };
 }
 
 export interface BuildLabelsPdfOptions {
@@ -65,6 +98,8 @@ export interface BuildLabelsPdfOptions {
   offsetXMm?: number;
   /** Shifts content down (positive) or up (negative) on every page, in mm. */
   offsetYMm?: number;
+  /** Shrinks content toward the page center (0.85–1). Default 0.96. */
+  contentScale?: number;
 }
 
 const renderSheetToPng: SheetRenderer = (sheet) =>
@@ -91,8 +126,11 @@ export async function buildLabelsPdf(
   }
 
   const renderSheet = options.renderSheet ?? renderSheetToPng;
-  const offsetX = clampOffsetMm(options.offsetXMm ?? 0);
-  const offsetY = clampOffsetMm(options.offsetYMm ?? 0);
+  const placement = computeImagePlacement(
+    options.offsetXMm ?? 0,
+    options.offsetYMm ?? 0,
+    options.contentScale ?? DEFAULT_CONTENT_SCALE
+  );
 
   const pdf = new jsPDF({
     orientation: "landscape",
@@ -109,10 +147,10 @@ export async function buildLabelsPdf(
     pdf.addImage(
       pngDataUrl,
       "PNG",
-      offsetX,
-      offsetY,
-      SHEET_WIDTH_MM,
-      SHEET_HEIGHT_MM
+      placement.x,
+      placement.y,
+      placement.width,
+      placement.height
     );
   }
 

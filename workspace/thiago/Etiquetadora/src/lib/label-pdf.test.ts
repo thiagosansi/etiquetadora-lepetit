@@ -8,6 +8,9 @@ import {
   buildLabelsPdf,
   clampOffsetMm,
   MAX_OFFSET_MM,
+  clampContentScale,
+  computeImagePlacement,
+  DEFAULT_CONTENT_SCALE,
 } from "./label-pdf";
 
 // html-to-image touches the DOM; unit tests run in node, so stub it out.
@@ -54,6 +57,31 @@ describe("clampOffsetMm", () => {
     expect(clampOffsetMm(NaN)).toBe(0);
     expect(clampOffsetMm(Infinity)).toBe(0);
     expect(clampOffsetMm(-Infinity)).toBe(0);
+  });
+});
+
+describe("content scale placement", () => {
+  it("clampContentScale keeps values within [0.85, 1] and defaults invalid to 0.96", () => {
+    expect(clampContentScale(0.9)).toBe(0.9);
+    expect(clampContentScale(1.2)).toBe(1);
+    expect(clampContentScale(0.5)).toBe(0.85);
+    expect(clampContentScale(NaN)).toBe(DEFAULT_CONTENT_SCALE);
+  });
+
+  it("centers scaled content on the page", () => {
+    const placement = computeImagePlacement(0, 0, 0.96);
+    expect(placement.width).toBeCloseTo(103 * 0.96, 6);
+    expect(placement.height).toBeCloseTo(30 * 0.96, 6);
+    // Centered: equal free space on both sides.
+    expect(placement.x).toBeCloseTo((103 - 103 * 0.96) / 2, 6);
+    expect(placement.y).toBeCloseTo((30 - 30 * 0.96) / 2, 6);
+    // Rightmost point pulled inward from the paper edge.
+    expect(placement.x + placement.width).toBeCloseTo(103 - placement.x, 6);
+  });
+
+  it("applies offsets on top of the centered placement", () => {
+    const placement = computeImagePlacement(-2, 1.5, 1);
+    expect(placement).toEqual({ x: -2, y: 1.5, width: 103, height: 30 });
   });
 });
 
