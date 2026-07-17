@@ -50,6 +50,23 @@ const PREVIEW_ONLY_STYLE_OVERRIDES: Partial<CSSStyleDeclaration> = {
 
 export type SheetRenderer = (sheet: HTMLElement) => Promise<string>;
 
+/** Max calibration offset. Larger values would push content off the label. */
+export const MAX_OFFSET_MM = 15;
+
+/** Clamps a calibration offset to [-15, 15]mm; invalid input becomes 0. */
+export function clampOffsetMm(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(MAX_OFFSET_MM, Math.max(-MAX_OFFSET_MM, value));
+}
+
+export interface BuildLabelsPdfOptions {
+  renderSheet?: SheetRenderer;
+  /** Shifts content right (positive) or left (negative) on every page, in mm. */
+  offsetXMm?: number;
+  /** Shifts content down (positive) or up (negative) on every page, in mm. */
+  offsetYMm?: number;
+}
+
 const renderSheetToPng: SheetRenderer = (sheet) =>
   toPng(sheet, {
     cacheBust: true,
@@ -62,15 +79,20 @@ const renderSheetToPng: SheetRenderer = (sheet) =>
 
 /**
  * Builds a PDF with one 103x30mm page per sheet element.
- * `renderSheet` is injectable for testing.
+ * Optional X/Y offsets (mm) shift the content on every page to compensate
+ * printer origin misalignment; the page size itself never changes.
  */
 export async function buildLabelsPdf(
   sheets: HTMLElement[],
-  renderSheet: SheetRenderer = renderSheetToPng
+  options: BuildLabelsPdfOptions = {}
 ): Promise<jsPDF> {
   if (!sheets.length) {
     throw new Error("buildLabelsPdf requires at least one sheet element");
   }
+
+  const renderSheet = options.renderSheet ?? renderSheetToPng;
+  const offsetX = clampOffsetMm(options.offsetXMm ?? 0);
+  const offsetY = clampOffsetMm(options.offsetYMm ?? 0);
 
   const pdf = new jsPDF({
     orientation: "landscape",
@@ -84,7 +106,14 @@ export async function buildLabelsPdf(
     if (index > 0) {
       pdf.addPage([SHEET_WIDTH_MM, SHEET_HEIGHT_MM], "landscape");
     }
-    pdf.addImage(pngDataUrl, "PNG", 0, 0, SHEET_WIDTH_MM, SHEET_HEIGHT_MM);
+    pdf.addImage(
+      pngDataUrl,
+      "PNG",
+      offsetX,
+      offsetY,
+      SHEET_WIDTH_MM,
+      SHEET_HEIGHT_MM
+    );
   }
 
   return pdf;

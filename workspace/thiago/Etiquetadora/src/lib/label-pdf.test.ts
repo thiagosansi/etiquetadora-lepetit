@@ -6,6 +6,8 @@ import {
   mmToCssPx,
   pixelRatioForDpi,
   buildLabelsPdf,
+  clampOffsetMm,
+  MAX_OFFSET_MM,
 } from "./label-pdf";
 
 // html-to-image touches the DOM; unit tests run in node, so stub it out.
@@ -40,20 +42,50 @@ describe("label-pdf geometry", () => {
   });
 });
 
+describe("clampOffsetMm", () => {
+  it("keeps values within [-15, 15]mm", () => {
+    expect(clampOffsetMm(3.5)).toBe(3.5);
+    expect(clampOffsetMm(-2)).toBe(-2);
+    expect(clampOffsetMm(99)).toBe(MAX_OFFSET_MM);
+    expect(clampOffsetMm(-99)).toBe(-MAX_OFFSET_MM);
+  });
+
+  it("maps invalid input to 0", () => {
+    expect(clampOffsetMm(NaN)).toBe(0);
+    expect(clampOffsetMm(Infinity)).toBe(0);
+    expect(clampOffsetMm(-Infinity)).toBe(0);
+  });
+});
+
 describe("buildLabelsPdf pagination", () => {
   it("creates exactly one PDF page per sheet (no blank pages possible)", async () => {
     const renderStub = vi.fn().mockResolvedValue(TINY_PNG);
     const sheets = [fakeSheet(), fakeSheet(), fakeSheet()];
 
-    const pdf = await buildLabelsPdf(sheets, renderStub);
+    const pdf = await buildLabelsPdf(sheets, { renderSheet: renderStub });
 
     expect(pdf.getNumberOfPages()).toBe(3);
     expect(renderStub).toHaveBeenCalledTimes(3);
   });
 
+  it("applies calibration offsets without changing page count or size", async () => {
+    const renderStub = vi.fn().mockResolvedValue(TINY_PNG);
+    const pdf = await buildLabelsPdf([fakeSheet(), fakeSheet()], {
+      renderSheet: renderStub,
+      offsetXMm: -1.5,
+      offsetYMm: 2,
+    });
+
+    expect(pdf.getNumberOfPages()).toBe(2);
+    expect(pdf.internal.pageSize.width).toBeCloseTo(SHEET_WIDTH_MM, 1);
+    expect(pdf.internal.pageSize.height).toBeCloseTo(SHEET_HEIGHT_MM, 1);
+  });
+
   it("every page has the exact 103x30mm dimensions", async () => {
     const renderStub = vi.fn().mockResolvedValue(TINY_PNG);
-    const pdf = await buildLabelsPdf([fakeSheet(), fakeSheet()], renderStub);
+    const pdf = await buildLabelsPdf([fakeSheet(), fakeSheet()], {
+      renderSheet: renderStub,
+    });
 
     for (let page = 1; page <= pdf.getNumberOfPages(); page++) {
       pdf.setPage(page);
@@ -64,8 +96,8 @@ describe("buildLabelsPdf pagination", () => {
   });
 
   it("rejects an empty sheet list", async () => {
-    await expect(buildLabelsPdf([], vi.fn())).rejects.toThrow(
-      /at least one sheet/
-    );
+    await expect(
+      buildLabelsPdf([], { renderSheet: vi.fn() })
+    ).rejects.toThrow(/at least one sheet/);
   });
 });

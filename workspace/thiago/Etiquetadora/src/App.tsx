@@ -9,7 +9,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { toPng } from "html-to-image";
-import { buildLabelsPdf } from "@/lib/label-pdf";
+import { buildLabelsPdf, clampOffsetMm } from "@/lib/label-pdf";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -97,6 +97,27 @@ interface ReciboItem {
   sabor: string;
   quantidade: string;
   valorUnitario: string;
+}
+
+/** Parses a calibration input ("1,5" or "1.5") into a clamped mm offset. */
+function parseOffsetMm(raw: string): number {
+  return clampOffsetMm(Number.parseFloat(raw.replace(",", ".")));
+}
+
+function readStoredOffset(key: string): string {
+  try {
+    return localStorage.getItem(key) ?? "0";
+  } catch {
+    return "0";
+  }
+}
+
+function storeOffset(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage failures (private mode) — calibration just won't persist.
+  }
 }
 
 function createEtiqueta(overrides?: Partial<EtiquetaData>): EtiquetaData {
@@ -253,6 +274,12 @@ export default function App() {
   const firstPage = useMemo(() => createPageFromTemplate(), []);
   const [modo, setModo] = useState<"etiqueta" | "recibo">("etiqueta");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [printOffsetX, setPrintOffsetX] = useState<string>(() =>
+    readStoredOffset("print-offset-x-mm")
+  );
+  const [printOffsetY, setPrintOffsetY] = useState<string>(() =>
+    readStoredOffset("print-offset-y-mm")
+  );
 
   const [sabor, setSabor] = useState(DEFAULT_FLAVOR);
   const [massa, setMassa] = useState("Tradicional");
@@ -549,7 +576,10 @@ const dataUrl = await toPng(exportNode, {
     try {
       // PDF with one exact 103x30mm page per sheet — browser pagination is
       // never involved, so blank pages and label drift cannot occur.
-      const pdf = await buildLabelsPdf(sheets);
+      const pdf = await buildLabelsPdf(sheets, {
+        offsetXMm: parseOffsetMm(printOffsetX),
+        offsetYMm: parseOffsetMm(printOffsetY),
+      });
       pdf.autoPrint();
       const blobUrl = pdf.output("bloburl").toString();
       const pdfWindow = window.open(blobUrl, "_blank");
@@ -1153,6 +1183,63 @@ const dataUrl = await toPng(exportNode, {
                   >
                     <RotateCcw className="mr-2 h-4 w-4" /> Resetar
                   </Button>
+                </div>
+
+                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+                  <p className="mb-2 text-sm font-medium text-neutral-800">
+                    Calibração da impressão (mm)
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label
+                        htmlFor="print-offset-x"
+                        className="text-xs text-neutral-600"
+                      >
+                        Horizontal (+ direita / − esquerda)
+                      </Label>
+                      <Input
+                        id="print-offset-x"
+                        type="number"
+                        inputMode="decimal"
+                        step={0.5}
+                        min={-15}
+                        max={15}
+                        value={printOffsetX}
+                        onChange={(event) => {
+                          setPrintOffsetX(event.target.value);
+                          storeOffset("print-offset-x-mm", event.target.value);
+                        }}
+                        className="mt-1 rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <Label
+                        htmlFor="print-offset-y"
+                        className="text-xs text-neutral-600"
+                      >
+                        Vertical (+ baixo / − cima)
+                      </Label>
+                      <Input
+                        id="print-offset-y"
+                        type="number"
+                        inputMode="decimal"
+                        step={0.5}
+                        min={-15}
+                        max={15}
+                        value={printOffsetY}
+                        onChange={(event) => {
+                          setPrintOffsetY(event.target.value);
+                          storeOffset("print-offset-y-mm", event.target.value);
+                        }}
+                        className="mt-1 rounded-xl"
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-neutral-500">
+                    Se o conteúdo sair deslocado na etiqueta física, ajuste aqui
+                    e imprima 1 página de teste. O valor fica salvo neste
+                    aparelho.
+                  </p>
                 </div>
 
                 <div className="rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-700">
