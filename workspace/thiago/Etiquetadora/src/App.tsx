@@ -9,7 +9,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { toPng } from "html-to-image";
-import { PRINT_CSS } from "@/lib/print-css";
+import { buildLabelsPdf } from "@/lib/label-pdf";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -252,6 +252,7 @@ function ReciboPreview({
 export default function App() {
   const firstPage = useMemo(() => createPageFromTemplate(), []);
   const [modo, setModo] = useState<"etiqueta" | "recibo">("etiqueta");
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const [sabor, setSabor] = useState(DEFAULT_FLAVOR);
   const [massa, setMassa] = useState("Tradicional");
@@ -536,41 +537,32 @@ const dataUrl = await toPng(exportNode, {
   }
 };
 
-  const handlePrint = () => {
-    const sheets = document.querySelectorAll<HTMLElement>(".print-area .sheet");
+  const handlePrint = async () => {
+    if (isGeneratingPdf) return;
+
+    const sheets = Array.from(
+      document.querySelectorAll<HTMLElement>(".print-area .sheet")
+    );
     if (!sheets.length) return;
 
-    const printWindow = window.open(
-      "",
-      "_blank",
-      `width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`
-    );
-    if (!printWindow) return;
-
-    // Collect only the .sheet elements — no wrapper divs, no script in body.
-    // This guarantees .sheet:last-child is unambiguous and wrappers cannot
-    // add phantom height that generates blank pages in WebKit.
-    const sheetsHtml = Array.from(sheets)
-      .map((el) => el.outerHTML)
-      .join("\n");
-
-    printWindow.document.write(`<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Etiquetas</title>
-    <style>${PRINT_CSS}</style>
-    <script>
-      window.onload = function () { window.print(); };
-      window.onafterprint = function () { window.close(); };
-    <\/script>
-  </head>
-  <body>
-    ${sheetsHtml}
-  </body>
-</html>`);
-
-    printWindow.document.close();
+    setIsGeneratingPdf(true);
+    try {
+      // PDF with one exact 103x30mm page per sheet — browser pagination is
+      // never involved, so blank pages and label drift cannot occur.
+      const pdf = await buildLabelsPdf(sheets);
+      pdf.autoPrint();
+      const blobUrl = pdf.output("bloburl").toString();
+      const pdfWindow = window.open(blobUrl, "_blank");
+      if (!pdfWindow) {
+        // Popup blocked — fall back to downloading the PDF.
+        pdf.save("etiquetas.pdf");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Não foi possível gerar o PDF das etiquetas.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   return (
@@ -1112,8 +1104,10 @@ const dataUrl = await toPng(exportNode, {
                     className="rounded-2xl"
                     variant="outline"
                     onClick={handlePrint}
+                    disabled={isGeneratingPdf}
                   >
-                    <Printer className="mr-2 h-4 w-4" /> Imprimir
+                    <Printer className="mr-2 h-4 w-4" />
+                    {isGeneratingPdf ? "Gerando PDF..." : "Imprimir"}
                   </Button>
 
                   <Button
