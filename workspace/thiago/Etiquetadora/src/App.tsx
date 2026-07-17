@@ -645,7 +645,11 @@ const dataUrl = await toPng(exportNode, {
         .label-box {
           width: var(--label-width);
           height: var(--label-height);
-          padding: 1.5mm 1.8mm 1.2mm 2mm;
+          /* padding-right 3.5mm keeps the logo of the RIGHT label inside the
+             printable width: it now ends at 99.5mm from the page's left edge,
+             safe even for drivers limited to 100mm (4" printers: 101.6mm).
+             With 1.8mm it ended at 101.2mm and was clipped on every sheet. */
+          padding: 1.5mm 3.5mm 1.2mm 2mm;
           overflow: hidden;
           font-family: Arial, Helvetica, sans-serif;
           color: #111;
