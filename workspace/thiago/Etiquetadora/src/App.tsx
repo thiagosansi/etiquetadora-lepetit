@@ -567,24 +567,28 @@ const dataUrl = await toPng(exportNode, {
   }
 };
 
-  const handlePrint = async () => {
-    if (isGeneratingPdf) return;
-
+  const generateLabelsPdf = async () => {
     const sheets = Array.from(
       document.querySelectorAll<HTMLElement>(".print-area .sheet")
     );
-    if (!sheets.length) return;
+    if (!sheets.length) return null;
+
+    // PDF with one exact 103x30mm page per sheet — browser pagination is
+    // never involved, so blank pages and label drift cannot occur.
+    return buildLabelsPdf(sheets, {
+      offsetXMm: parseOffsetMm(printOffsetX),
+      offsetYMm: parseOffsetMm(printOffsetY),
+      contentScale: Number.parseFloat(printScalePct.replace(",", ".")) / 100,
+    });
+  };
+
+  const handlePrint = async () => {
+    if (isGeneratingPdf) return;
 
     setIsGeneratingPdf(true);
     try {
-      // PDF with one exact 103x30mm page per sheet — browser pagination is
-      // never involved, so blank pages and label drift cannot occur.
-      const pdf = await buildLabelsPdf(sheets, {
-        offsetXMm: parseOffsetMm(printOffsetX),
-        offsetYMm: parseOffsetMm(printOffsetY),
-        contentScale:
-          Number.parseFloat(printScalePct.replace(",", ".")) / 100,
-      });
+      const pdf = await generateLabelsPdf();
+      if (!pdf) return;
       pdf.autoPrint();
       const blobUrl = pdf.output("bloburl").toString();
       const pdfWindow = window.open(blobUrl, "_blank");
@@ -592,6 +596,24 @@ const dataUrl = await toPng(exportNode, {
         // Popup blocked — fall back to downloading the PDF.
         pdf.save("etiquetas.pdf");
       }
+    } catch (error) {
+      console.error(error);
+      alert("Não foi possível gerar o PDF das etiquetas.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (isGeneratingPdf) return;
+
+    setIsGeneratingPdf(true);
+    try {
+      const pdf = await generateLabelsPdf();
+      if (!pdf) return;
+      // Printing the downloaded file from a native viewer (Preview/Adobe)
+      // bypasses Chrome's PDF viewer, which can print unrendered pages blank.
+      pdf.save("etiquetas.pdf");
     } catch (error) {
       console.error(error);
       alert("Não foi possível gerar o PDF das etiquetas.");
@@ -1151,6 +1173,15 @@ const dataUrl = await toPng(exportNode, {
 
                   <Button
                     className="rounded-2xl"
+                    variant="outline"
+                    onClick={handleDownloadPdf}
+                    disabled={isGeneratingPdf}
+                  >
+                    <Download className="mr-2 h-4 w-4" /> Baixar PDF
+                  </Button>
+
+                  <Button
+                    className="rounded-2xl"
                     variant="secondary"
                     onClick={addMoreEtiquetas}
                   >
@@ -1310,6 +1341,15 @@ const dataUrl = await toPng(exportNode, {
                       <p>
                         Depois disso o navegador memoriza o papel e as próximas
                         impressões saem corretas.
+                      </p>
+                      <p className="border-t border-amber-200 pt-2">
+                        <strong>Páginas em branco no meio do trabalho?</strong>{" "}
+                        O visualizador de PDF do Chrome pode imprimir em branco
+                        páginas que ainda não foram exibidas. Soluções: (1) role
+                        o PDF até a última página antes de imprimir; (2) use{" "}
+                        <strong>Baixar PDF</strong> e imprima pelo
+                        Pré-Visualização (Mac) ou Adobe Reader; (3) imprima em
+                        lotes de 3 a 5 páginas.
                       </p>
                     </div>
                   </details>
