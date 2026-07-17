@@ -1270,6 +1270,49 @@ const dataUrl = await toPng(exportNode, {
                     e imprima 1 página de teste. O valor fica salvo neste
                     aparelho.
                   </p>
+
+                  <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <summary className="cursor-pointer text-sm font-medium text-amber-900">
+                      ⚠️ Configurar a impressora (obrigatório na 1ª impressão)
+                    </summary>
+                    <div className="mt-2 space-y-2 text-xs text-amber-900">
+                      <p>
+                        Se saírem etiquetas em branco, conteúdo girado ou
+                        encolhido, o <strong>tamanho do papel</strong> no
+                        diálogo de impressão está errado. Configure uma única
+                        vez:
+                      </p>
+                      <ol className="list-decimal space-y-1 pl-4">
+                        <li>
+                          Clique em <strong>Imprimir</strong> e, no diálogo,
+                          abra <strong>Mais definições</strong>.
+                        </li>
+                        <li>
+                          Em <strong>Tamanho do papel</strong>, escolha o
+                          tamanho <strong>103 × 30 mm</strong> (ou o nome usado
+                          pelo driver, ex.: "103mm x 30mm").
+                        </li>
+                        <li>
+                          No Mac, se não existir: <strong>Tamanho do papel →
+                          Gerenciar tamanhos personalizados → +</strong>, defina
+                          largura <strong>103 mm</strong>, altura{" "}
+                          <strong>30 mm</strong> e margens <strong>0</strong>.
+                        </li>
+                        <li>
+                          Em <strong>Escala</strong>, use <strong>100%</strong>{" "}
+                          — nunca "Ajustar à página".
+                        </li>
+                        <li>
+                          Margens: <strong>Nenhuma</strong>. Imprima 1 página de
+                          teste.
+                        </li>
+                      </ol>
+                      <p>
+                        Depois disso o navegador memoriza o papel e as próximas
+                        impressões saem corretas.
+                      </p>
+                    </div>
+                  </details>
                 </div>
 
                 <div className="rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-700">
