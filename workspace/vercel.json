@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd thiago/Etiquetadora && npm install --include=dev",
+  "buildCommand": "cd thiago/Etiquetadora && npm run build",
+  "outputDirectory": "thiago/Etiquetadora/dist"
+}
