@@ -113,6 +113,14 @@ const renderSheetToPng: SheetRenderer = (sheet) =>
   });
 
 /**
+ * Captures a single sheet element as a PNG data URL at 300 DPI.
+ * Used by the direct-print flow (HTML print window) to pre-render all sheets
+ * before the print dialog opens, avoiding Chrome PDF viewer lazy-rendering
+ * which would otherwise produce blank pages for off-screen PDF pages.
+ */
+export const captureSheetAsPng: SheetRenderer = renderSheetToPng;
+
+/**
  * Builds a PDF with one 103x30mm page per sheet element.
  * Optional X/Y offsets (mm) shift the content on every page to compensate
  * printer origin misalignment; the page size itself never changes.

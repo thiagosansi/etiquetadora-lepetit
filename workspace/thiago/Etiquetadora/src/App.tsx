@@ -9,7 +9,14 @@ import {
   Receipt,
 } from "lucide-react";
 import { toPng } from "html-to-image";
-import { buildLabelsPdf, clampOffsetMm } from "@/lib/label-pdf";
+import {
+  buildLabelsPdf,
+  captureSheetAsPng,
+  clampContentScale,
+  clampOffsetMm,
+  SHEET_HEIGHT_MM,
+  SHEET_WIDTH_MM,
+} from "@/lib/label-pdf";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -587,18 +594,67 @@ const dataUrl = await toPng(exportNode, {
 
     setIsGeneratingPdf(true);
     try {
-      const pdf = await generateLabelsPdf();
-      if (!pdf) return;
-      pdf.autoPrint();
-      const blobUrl = pdf.output("bloburl").toString();
-      const pdfWindow = window.open(blobUrl, "_blank");
-      if (!pdfWindow) {
+      const sheets = Array.from(
+        document.querySelectorAll<HTMLElement>(".print-area .sheet")
+      );
+      if (!sheets.length) return;
+
+      // Pre-render every sheet to a PNG data URL before opening the print
+      // dialog. Data URLs are synchronously available in the new window, so
+      // the browser never encounters un-rendered pages — which was the root
+      // cause of Chrome's PDF viewer producing blank pages for any page that
+      // had not yet been scrolled into view before autoPrint() fired.
+      const pngDataUrls = await Promise.all(
+        sheets.map((sheet) => captureSheetAsPng(sheet))
+      );
+
+      // Mirror the PDF placement logic: scale content and center it on the
+      // page, with optional X/Y offset for printer origin calibration.
+      const scale = clampContentScale(
+        Number.parseFloat(printScalePct.replace(",", ".")) / 100
+      );
+      const offsetXMm = parseOffsetMm(printOffsetX);
+      const offsetYMm = parseOffsetMm(printOffsetY);
+      const imgWidthMm = SHEET_WIDTH_MM * scale;
+      const imgHeightMm = SHEET_HEIGHT_MM * scale;
+      const imgLeftMm = offsetXMm + (SHEET_WIDTH_MM - imgWidthMm) / 2;
+      const imgTopMm = offsetYMm + (SHEET_HEIGHT_MM - imgHeightMm) / 2;
+      const imgStyle = [
+        `position:absolute`,
+        `left:${imgLeftMm.toFixed(3)}mm`,
+        `top:${imgTopMm.toFixed(3)}mm`,
+        `width:${imgWidthMm.toFixed(3)}mm`,
+        `height:${imgHeightMm.toFixed(3)}mm`,
+      ].join(";");
+
+      const pagesHtml = pngDataUrls
+        .map((src) => `<div class="p"><img src="${src}" style="${imgStyle}"></div>`)
+        .join("");
+
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+@page{size:${SHEET_WIDTH_MM}mm ${SHEET_HEIGHT_MM}mm;margin:0}
+html,body{width:${SHEET_WIDTH_MM}mm}
+.p{position:relative;width:${SHEET_WIDTH_MM}mm;height:${SHEET_HEIGHT_MM}mm;overflow:hidden;page-break-after:always}
+.p:last-child{page-break-after:avoid}
+</style></head><body>${pagesHtml}
+<script>window.addEventListener('load',function(){window.focus();window.print();});<\/script>
+</body></html>`;
+
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
         // Popup blocked — fall back to downloading the PDF.
-        pdf.save("etiquetas.pdf");
+        const pdf = await generateLabelsPdf();
+        if (pdf) pdf.save("etiquetas.pdf");
+        return;
       }
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
     } catch (error) {
       console.error(error);
-      alert("Não foi possível gerar o PDF das etiquetas.");
+      alert("Não foi possível gerar as etiquetas para impressão.");
     } finally {
       setIsGeneratingPdf(false);
     }
